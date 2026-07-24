@@ -15,8 +15,10 @@ import (
 )
 
 type ConnectionInfo struct {
-	ConnectionID string
-	Hostname     string
+	ConnectionID  string
+	Hostname      string
+	TailscaleIP   string
+	TailscaleIPv6 string
 }
 
 type ConnectController struct {
@@ -178,8 +180,12 @@ func (c *ConnectController) ConnectAsync(
 		}
 
 		report("Iniciando serviços...")
+		targetIP := resp.TailscaleIP
+		if targetIP == "" {
+			targetIP = resp.Hostname
+		}
 		if c.fwdService != nil && c.dialer != nil {
-			if err := c.fwdService.StartAll(resp.Hostname, c.dialer); err != nil {
+			if err := c.fwdService.StartAll(targetIP, c.dialer); err != nil {
 				if onError != nil {
 					onError(fmt.Errorf("falha ao iniciar serviços: %w", err))
 				}
@@ -190,8 +196,10 @@ func (c *ConnectController) ConnectAsync(
 		report("✓ Conectado")
 
 		info := &ConnectionInfo{
-			ConnectionID: resp.ConnectionID.String(),
-			Hostname:     resp.Hostname,
+			ConnectionID:  resp.ConnectionID.String(),
+			Hostname:      resp.Hostname,
+			TailscaleIP:   resp.TailscaleIP,
+			TailscaleIPv6: resp.TailscaleIPv6,
 		}
 
 		c.mu.Lock()

@@ -21,7 +21,8 @@ type ConnectedPage struct {
 	window         fyne.Window
 	statusCard     *widgets.StatusCard
 	containerLabel *widget.Label
-	hostLabel      *widget.Label
+	ipLabel        *widget.Label
+	ipv6Label      *widget.Label
 	controller     *controller.ConnectController
 	onDisconnected func()
 	info           *controller.ConnectionInfo
@@ -51,11 +52,13 @@ func NewConnectedPage(w fyne.Window, ctrl *controller.ConnectController, onDisco
 	header := widget.NewLabelWithStyle("Cloud Client", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 
 	cp.containerLabel = widget.NewLabelWithStyle("-", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	cp.hostLabel = widget.NewLabelWithStyle("-", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	cp.ipLabel = widget.NewLabelWithStyle("-", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	cp.ipv6Label = widget.NewLabelWithStyle("-", fyne.TextAlignLeading, fyne.TextStyle{Italic: true})
 
 	infoBox := container.NewVBox(
 		container.NewHBox(widget.NewLabel("Container:"), cp.containerLabel),
-		container.NewHBox(widget.NewLabel("Host Remote:"), cp.hostLabel),
+		container.NewHBox(widget.NewLabel("IP Tailscale:"), cp.ipLabel),
+		container.NewHBox(widget.NewLabel("IPv6:"), cp.ipv6Label),
 	)
 
 	cp.defaultsContainer = container.NewVBox()
@@ -110,10 +113,18 @@ func (cp *ConnectedPage) SetConnectionInfo(info *controller.ConnectionInfo) {
 	if info != nil {
 		if info.Hostname != "" {
 			cp.containerLabel.SetText(info.Hostname)
-			cp.hostLabel.SetText(info.Hostname)
 		} else {
 			cp.containerLabel.SetText("Container " + info.ConnectionID)
-			cp.hostLabel.SetText(info.ConnectionID)
+		}
+		if info.TailscaleIP != "" {
+			cp.ipLabel.SetText(info.TailscaleIP)
+		} else {
+			cp.ipLabel.SetText("-")
+		}
+		if info.TailscaleIPv6 != "" {
+			cp.ipv6Label.SetText(info.TailscaleIPv6)
+		} else {
+			cp.ipv6Label.SetText("-")
 		}
 	}
 	cp.RefreshForwardings()

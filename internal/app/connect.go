@@ -60,7 +60,7 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 	uc.logger.Info("")
 	uc.logger.Info("Starting local forwardings...")
 
-	if err := uc.fwdService.StartAll(resp.Hostname, uc.dialer); err != nil {
+	if err := uc.fwdService.StartAll(resp.TailscaleIP, uc.dialer); err != nil {
 		return fmt.Errorf("failed to start forwardings: %w", err)
 	}
 

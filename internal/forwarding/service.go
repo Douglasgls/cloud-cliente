@@ -311,9 +311,6 @@ func (s *Service) Toggle(id string, enabled bool) error {
 
 func (s *Service) StartAll(targetHost string, dialer Dialer) error {
 	cleanHost := strings.TrimSpace(targetHost)
-	if lines := strings.Split(cleanHost, "\n"); len(lines) > 0 {
-		cleanHost = strings.TrimSpace(lines[0])
-	}
 	s.mu.Lock()
 	s.targetHost = cleanHost
 	s.dialer = dialer

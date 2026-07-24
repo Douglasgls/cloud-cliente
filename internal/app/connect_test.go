@@ -70,6 +70,7 @@ func TestConnectUseCase_Success(t *testing.T) {
 				LoginServer:  "https://headscale.example.com",
 				PreauthKey:   "key123",
 				Hostname:     "host-a",
+				TailscaleIP:  "100.64.0.2",
 				ConnectionID: "conn-123",
 			}, nil
 		},

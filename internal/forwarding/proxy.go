@@ -29,14 +29,10 @@ type TCPProxy struct {
 }
 
 func NewTCPProxy(id string, localPort int, targetHost string, remotePort int, dialer Dialer, log *logger.Logger) *TCPProxy {
-	cleanHost := strings.TrimSpace(targetHost)
-	if lines := strings.Split(cleanHost, "\n"); len(lines) > 0 {
-		cleanHost = strings.TrimSpace(lines[0])
-	}
 	return &TCPProxy{
 		id:         id,
 		localPort:  localPort,
-		targetHost: cleanHost,
+		targetHost: strings.TrimSpace(targetHost),
 		remotePort: remotePort,
 		dialer:     dialer,
 		log:        log,

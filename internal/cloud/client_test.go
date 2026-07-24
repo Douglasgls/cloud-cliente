@@ -23,11 +23,12 @@ func TestClient_Connect_Success(t *testing.T) {
 		}
 
 		resp := ConnectResponse{
-			LoginServer:  "https://headscale.example.com",
-			PreauthKey:   "key12345",
-			Hostname:     "host-01",
-			ConnectionID: "conn-999",
-			ExpiresAt:    "2026-12-31T23:59:59Z",
+			LoginServer:   "https://headscale.example.com",
+			PreauthKey:    "key12345",
+			Hostname:      "host-01",
+			TailscaleIP:   "100.64.0.2",
+			ConnectionID:  "conn-999",
+			ExpiresAt:     "2026-12-31T23:59:59Z",
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(resp)

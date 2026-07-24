@@ -36,11 +36,13 @@ type ConnectRequest struct {
 }
 
 type ConnectResponse struct {
-	LoginServer  string     `json:"login_server"`
-	PreauthKey   string     `json:"preauth_key"`
-	Hostname     string     `json:"hostname"`
-	ConnectionID FlexibleID `json:"connection_id"`
-	ExpiresAt    string     `json:"expires_at,omitempty"`
+	LoginServer   string     `json:"login_server"`
+	PreauthKey    string     `json:"preauth_key"`
+	Hostname      string     `json:"hostname"`
+	TailscaleIP   string     `json:"tailscale_ip"`
+	TailscaleIPv6 string     `json:"tailscale_ipv6,omitempty"`
+	ConnectionID  FlexibleID `json:"connection_id"`
+	ExpiresAt     string     `json:"expires_at,omitempty"`
 }
 
 type ConnectApiResponse struct {
