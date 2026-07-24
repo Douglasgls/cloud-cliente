@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 	"cloud-client/internal/config"
 	"cloud-client/internal/forwarding"
 	"cloud-client/internal/runtime"
+	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
 )
@@ -29,6 +31,7 @@ type ConnectController struct {
 	tsService   tailscale.TailscaleService
 	fwdService  forwarding.ForwardingService
 	dialer      forwarding.Dialer
+	sessionSvc  session.SessionService
 	browser     browser.Opener
 
 	mu            sync.Mutex
@@ -45,6 +48,7 @@ func NewConnectController(
 	tsService tailscale.TailscaleService,
 	fwdService forwarding.ForwardingService,
 	dialer forwarding.Dialer,
+	sessionSvc session.SessionService,
 	browserOpener browser.Opener,
 ) *ConnectController {
 	return &ConnectController{
@@ -55,6 +59,7 @@ func NewConnectController(
 		tsService:   tsService,
 		fwdService:  fwdService,
 		dialer:      dialer,
+		sessionSvc:  sessionSvc,
 		browser:     browserOpener,
 	}
 }
@@ -63,6 +68,17 @@ func (c *ConnectController) IsConnected() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.isConnected
+}
+
+func (c *ConnectController) HasSession() bool {
+	return c.sessionSvc != nil && c.sessionSvc.HasSession()
+}
+
+func (c *ConnectController) DeleteSession() error {
+	if c.sessionSvc == nil {
+		return nil
+	}
+	return c.sessionSvc.Delete()
 }
 
 func (c *ConnectController) GetConnectionInfo() *ConnectionInfo {
@@ -108,6 +124,29 @@ func (c *ConnectController) ToggleForwarding(id string, enabled bool) error {
 		return fmt.Errorf("forwarding service not available")
 	}
 	return c.fwdService.Toggle(id, enabled)
+}
+
+func (c *ConnectController) ReconnectAsync(
+	onProgress func(step string),
+	onSuccess func(info *ConnectionInfo),
+	onError func(err error),
+) {
+	if c.sessionSvc == nil || !c.sessionSvc.HasSession() {
+		if onError != nil {
+			onError(fmt.Errorf("Nenhuma sessão salva encontrada"))
+		}
+		return
+	}
+
+	sess, err := c.sessionSvc.Load()
+	if err != nil || sess.AccessToken == "" {
+		if onError != nil {
+			onError(fmt.Errorf("Falha ao carregar sessão salva: %v", err))
+		}
+		return
+	}
+
+	c.ConnectAsync(sess.AccessToken, onProgress, onSuccess, onError)
 }
 
 func (c *ConnectController) ConnectAsync(
@@ -157,6 +196,11 @@ func (c *ConnectController) ConnectAsync(
 		report("Solicitando autorização...")
 		resp, err := c.cloudClient.Connect(ctx, token)
 		if err != nil {
+			if errors.Is(err, cloud.ErrInvalidToken) || errors.Is(err, cloud.ErrConnectionExpired) {
+				if c.sessionSvc != nil {
+					_ = c.sessionSvc.Delete()
+				}
+			}
 			if onError != nil {
 				onError(err)
 			}
@@ -177,6 +221,10 @@ func (c *ConnectController) ConnectAsync(
 				onError(fmt.Errorf("falha na confirmação: %w", err))
 			}
 			return
+		}
+
+		if c.sessionSvc != nil {
+			_ = c.sessionSvc.Save(token)
 		}
 
 		report("Iniciando serviços...")
@@ -224,6 +272,10 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 
 	if c.fwdService != nil {
 		_ = c.fwdService.StopAll()
+	}
+
+	if c.sessionSvc != nil {
+		_ = c.sessionSvc.Delete()
 	}
 
 	c.isConnected = false

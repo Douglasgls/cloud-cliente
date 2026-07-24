@@ -10,6 +10,7 @@ import (
 
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/forwarding"
+	"cloud-client/internal/session"
 	"cloud-client/pkg/logger"
 )
 
@@ -94,8 +95,10 @@ func TestConnectUseCase_Success(t *testing.T) {
 	storage, _ := forwarding.NewJSONStorage(filepath.Join(tempDir, "forwardings.json"))
 	fwdSvc, _ := forwarding.NewService(storage, log)
 	dialer := forwarding.NewDirectDialer()
+	sStorage, _ := session.NewJSONStorage(filepath.Join(tempDir, "session.json"))
+	sessionSvc := session.NewService(sStorage)
 
-	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, log)
+	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, sessionSvc, log)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -133,8 +136,10 @@ func TestConnectUseCase_CloudConnectError(t *testing.T) {
 	storage, _ := forwarding.NewJSONStorage(filepath.Join(tempDir, "forwardings.json"))
 	fwdSvc, _ := forwarding.NewService(storage, log)
 	dialer := forwarding.NewDirectDialer()
+	sStorage, _ := session.NewJSONStorage(filepath.Join(tempDir, "session.json"))
+	sessionSvc := session.NewService(sStorage)
 
-	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, log)
+	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, sessionSvc, log)
 	err := uc.Execute(context.Background(), "bad-token")
 	if err == nil {
 		t.Fatal("expected error, got nil")

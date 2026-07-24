@@ -15,6 +15,7 @@ import (
 	"cloud-client/internal/gui"
 	"cloud-client/internal/gui/controller"
 	"cloud-client/internal/runtime"
+	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
 )
@@ -40,6 +41,13 @@ func main() {
 			os.Exit(1)
 		}
 		dialer := forwarding.NewSocks5Dialer(runtimeMgr.Socks5Addr(), log)
+
+		sStorage, err := session.NewJSONStorage("")
+		if err != nil {
+			log.Error("Error initializing session storage: %v", err)
+			os.Exit(1)
+		}
+		sessionSvc := session.NewService(sStorage)
 		browserOpener := browser.New()
 
 		ctrl := controller.NewConnectController(
@@ -50,6 +58,7 @@ func main() {
 			tsService,
 			fwdService,
 			dialer,
+			sessionSvc,
 			browserOpener,
 		)
 
@@ -97,9 +106,16 @@ func main() {
 	}
 	dialer := forwarding.NewSocks5Dialer(runtimeMgr.Socks5Addr(), log)
 
+	sStorage, err := session.NewJSONStorage("")
+	if err != nil {
+		log.Error("Error initializing session storage: %v", err)
+		os.Exit(1)
+	}
+	sessionSvc := session.NewService(sStorage)
+
 	switch cmd.Name {
 	case "connect":
-		connectUC := app.NewConnectUseCase(cloudClient, tsService, fwdService, dialer, log)
+		connectUC := app.NewConnectUseCase(cloudClient, tsService, fwdService, dialer, sessionSvc, log)
 		if err := connectUC.Execute(ctx, cmd.Token); err != nil && err != context.Canceled {
 			log.Error("Error: %v", err)
 			os.Exit(1)

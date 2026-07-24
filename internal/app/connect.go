@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/forwarding"
+	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
 )
@@ -15,6 +17,7 @@ type ConnectUseCase struct {
 	tsService   tailscale.TailscaleService
 	fwdService  forwarding.ForwardingService
 	dialer      forwarding.Dialer
+	sessionSvc  session.SessionService
 	logger      *logger.Logger
 }
 
@@ -23,6 +26,7 @@ func NewConnectUseCase(
 	tsService tailscale.TailscaleService,
 	fwdService forwarding.ForwardingService,
 	dialer forwarding.Dialer,
+	sessionSvc session.SessionService,
 	log *logger.Logger,
 ) *ConnectUseCase {
 	return &ConnectUseCase{
@@ -30,6 +34,7 @@ func NewConnectUseCase(
 		tsService:   tsService,
 		fwdService:  fwdService,
 		dialer:      dialer,
+		sessionSvc:  sessionSvc,
 		logger:      log,
 	}
 }
@@ -40,6 +45,11 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 
 	resp, err := uc.cloudClient.Connect(ctx, token)
 	if err != nil {
+		if errors.Is(err, cloud.ErrInvalidToken) || errors.Is(err, cloud.ErrConnectionExpired) {
+			if uc.sessionSvc != nil {
+				_ = uc.sessionSvc.Delete()
+			}
+		}
 		return err
 	}
 
@@ -54,6 +64,12 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 	_, err = uc.cloudClient.Confirm(ctx, resp.ConnectionID.String())
 	if err != nil {
 		return fmt.Errorf("failed to confirm connection: %w", err)
+	}
+
+	if uc.sessionSvc != nil {
+		if err := uc.sessionSvc.Save(token); err != nil {
+			uc.logger.Error("Failed to save session: %v", err)
+		}
 	}
 
 	uc.logger.Info("Connection confirmed")
