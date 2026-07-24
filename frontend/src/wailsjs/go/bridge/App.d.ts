@@ -1,0 +1,29 @@
+import {bridge} from '../models';
+
+export function AddForwarding(arg1:string,arg2:number,arg3:number):Promise<bridge.ForwardingDTO>;
+
+export function Connect(arg1:string):Promise<void>;
+
+export function CopyToClipboard(arg1:string):Promise<void>;
+
+export function DeleteForwarding(arg1:string):Promise<void>;
+
+export function DeleteSession():Promise<void>;
+
+export function Disconnect():Promise<void>;
+
+export function GetConnectionInfo():Promise<bridge.ConnectionInfoDTO>;
+
+export function HasSession():Promise<boolean>;
+
+export function IsConnected():Promise<boolean>;
+
+export function ListForwardings():Promise<Array<bridge.ForwardingDTO>>;
+
+export function OpenURL(arg1:string):Promise<void>;
+
+export function Reconnect():Promise<void>;
+
+export function ToggleForwarding(arg1:string,arg2:boolean):Promise<void>;
+
+export function UpdateForwarding(arg1:string,arg2:string,arg3:number,arg4:number,arg5:boolean):Promise<void>;

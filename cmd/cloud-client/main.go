@@ -7,13 +7,10 @@ import (
 	"syscall"
 
 	"cloud-client/internal/app"
-	"cloud-client/internal/browser"
 	"cloud-client/internal/cli"
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/config"
 	"cloud-client/internal/forwarding"
-	"cloud-client/internal/gui"
-	"cloud-client/internal/gui/controller"
 	"cloud-client/internal/runtime"
 	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
@@ -24,45 +21,9 @@ func main() {
 	cfg := config.Load()
 
 	if len(os.Args) <= 1 {
-		// Launch Fyne Desktop GUI mode when run without arguments
+		// CLI fallback when no command specified
 		log := logger.New(false)
-		runtimeMgr := runtime.NewManager(log)
-		cloudClient := cloud.NewClient(cfg, log)
-		tsService := tailscale.NewService(runtimeMgr)
-
-		storage, err := forwarding.NewJSONStorage("")
-		if err != nil {
-			log.Error("Error initializing storage: %v", err)
-			os.Exit(1)
-		}
-		fwdService, err := forwarding.NewService(storage, log)
-		if err != nil {
-			log.Error("Error initializing forwarding service: %v", err)
-			os.Exit(1)
-		}
-		dialer := forwarding.NewSocks5Dialer(runtimeMgr.Socks5Addr(), log)
-
-		sStorage, err := session.NewJSONStorage("")
-		if err != nil {
-			log.Error("Error initializing session storage: %v", err)
-			os.Exit(1)
-		}
-		sessionSvc := session.NewService(sStorage)
-		browserOpener := browser.New()
-
-		ctrl := controller.NewConnectController(
-			cfg,
-			log,
-			runtimeMgr,
-			cloudClient,
-			tsService,
-			fwdService,
-			dialer,
-			sessionSvc,
-			browserOpener,
-		)
-
-		gui.RunApp(ctrl)
+		log.Info("Cloud Client CLI - para iniciar a GUI desktop, execute a aplicação Wails.")
 		return
 	}
 

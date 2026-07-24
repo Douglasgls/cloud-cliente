@@ -1,0 +1,55 @@
+export function AddForwarding(arg1, arg2, arg3) {
+  return window['go']['bridge']['App']['AddForwarding'](arg1, arg2, arg3);
+}
+
+export function Connect(arg1) {
+  return window['go']['bridge']['App']['Connect'](arg1);
+}
+
+export function CopyToClipboard(arg1) {
+  return window['go']['bridge']['App']['CopyToClipboard'](arg1);
+}
+
+export function DeleteForwarding(arg1) {
+  return window['go']['bridge']['App']['DeleteForwarding'](arg1);
+}
+
+export function DeleteSession() {
+  return window['go']['bridge']['App']['DeleteSession']();
+}
+
+export function Disconnect() {
+  return window['go']['bridge']['App']['Disconnect']();
+}
+
+export function GetConnectionInfo() {
+  return window['go']['bridge']['App']['GetConnectionInfo']();
+}
+
+export function HasSession() {
+  return window['go']['bridge']['App']['HasSession']();
+}
+
+export function IsConnected() {
+  return window['go']['bridge']['App']['IsConnected']();
+}
+
+export function ListForwardings() {
+  return window['go']['bridge']['App']['ListForwardings']();
+}
+
+export function OpenURL(arg1) {
+  return window['go']['bridge']['App']['OpenURL'](arg1);
+}
+
+export function Reconnect() {
+  return window['go']['bridge']['App']['Reconnect']();
+}
+
+export function ToggleForwarding(arg1, arg2) {
+  return window['go']['bridge']['App']['ToggleForwarding'](arg1, arg2);
+}
+
+export function UpdateForwarding(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['bridge']['App']['UpdateForwarding'](arg1, arg2, arg3, arg4, arg5);
+}
