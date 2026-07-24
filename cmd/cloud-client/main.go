@@ -11,6 +11,8 @@ import (
 	"cloud-client/internal/cli"
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/config"
+	"cloud-client/internal/gui"
+	"cloud-client/internal/gui/controller"
 	"cloud-client/internal/proxy"
 	"cloud-client/internal/runtime"
 	"cloud-client/internal/tailscale"
@@ -18,6 +20,32 @@ import (
 )
 
 func main() {
+	cfg := config.Load()
+
+	if len(os.Args) <= 1 {
+		// Launch Fyne Desktop GUI mode when run without arguments
+		log := logger.New(false)
+		runtimeMgr := runtime.NewManager(log)
+		cloudClient := cloud.NewClient(cfg, log)
+		tsService := tailscale.NewService(runtimeMgr)
+		proxyService := proxy.NewService(log, runtimeMgr.Socks5Addr())
+		browserOpener := browser.New()
+
+		ctrl := controller.NewConnectController(
+			cfg,
+			log,
+			runtimeMgr,
+			cloudClient,
+			tsService,
+			proxyService,
+			browserOpener,
+		)
+
+		gui.RunApp(ctrl)
+		return
+	}
+
+	// CLI execution mode
 	cmd, err := cli.Parse(os.Args[1:])
 	if err != nil {
 		log := logger.New(false)
@@ -25,7 +53,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	cfg := config.Load()
 	isDebug := cmd.Debug || os.Getenv("DEBUG") == "true" || os.Getenv("DEBUG") == "1"
 	log := logger.New(isDebug)
 
