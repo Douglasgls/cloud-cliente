@@ -24,7 +24,7 @@ func NewMainWindow(ctrl *controller.ConnectController) *MainWindow {
 	fyneApp.Settings().SetTheme(theme.DarkTheme())
 
 	w := fyneApp.NewWindow("Cloud Client")
-	w.Resize(fyne.NewSize(700, 450))
+	w.Resize(fyne.NewSize(750, 550))
 
 	mw := &MainWindow{
 		app:        fyneApp,
@@ -41,7 +41,7 @@ func NewMainWindow(ctrl *controller.ConnectController) *MainWindow {
 		mw.mainContainer.Refresh()
 	})
 
-	connected = pages.NewConnectedPage(ctrl, func() {
+	connected = pages.NewConnectedPage(w, ctrl, func() {
 		home.Reset()
 		mw.mainContainer.Objects = []fyne.CanvasObject{home.Content}
 		mw.mainContainer.Refresh()

@@ -46,7 +46,8 @@ type Manager struct {
 
 func NewManager(log *logger.Logger) *Manager {
 	return &Manager{
-		logger: log,
+		logger:     log,
+		socks5Addr: "127.0.0.1:1055",
 	}
 }
 

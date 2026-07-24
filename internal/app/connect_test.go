@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"cloud-client/internal/cloud"
+	"cloud-client/internal/forwarding"
 	"cloud-client/pkg/logger"
 )
 
@@ -57,44 +59,6 @@ func (m *mockTailscaleService) Version(ctx context.Context) (string, error) {
 	return "", nil
 }
 
-type mockProxyService struct {
-	startFunc func(target string) (string, error)
-	stopFunc  func(ctx context.Context) error
-}
-
-func (m *mockProxyService) Start(target string) (string, error) {
-	if m.startFunc != nil {
-		return m.startFunc(target)
-	}
-	return "http://127.0.0.1:8080", nil
-}
-
-func (m *mockProxyService) Stop(ctx context.Context) error {
-	if m.stopFunc != nil {
-		return m.stopFunc(ctx)
-	}
-	return nil
-}
-
-func (m *mockProxyService) TargetURL() string {
-	return "http://100.64.0.2"
-}
-
-func (m *mockProxyService) LocalURL() string {
-	return "http://127.0.0.1:8080"
-}
-
-type mockBrowserOpener struct {
-	openFunc func(url string) error
-}
-
-func (m *mockBrowserOpener) Open(url string) error {
-	if m.openFunc != nil {
-		return m.openFunc(url)
-	}
-	return nil
-}
-
 func TestConnectUseCase_Success(t *testing.T) {
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
@@ -125,10 +89,12 @@ func TestConnectUseCase_Success(t *testing.T) {
 		},
 	}
 
-	mockProxy := &mockProxyService{}
-	mockBrowser := &mockBrowserOpener{}
+	tempDir := t.TempDir()
+	storage, _ := forwarding.NewJSONStorage(filepath.Join(tempDir, "forwardings.json"))
+	fwdSvc, _ := forwarding.NewService(storage, log)
+	dialer := forwarding.NewDirectDialer()
 
-	uc := NewConnectUseCase(mockCloud, mockTS, mockProxy, mockBrowser, log)
+	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, log)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -162,10 +128,12 @@ func TestConnectUseCase_CloudConnectError(t *testing.T) {
 		},
 	}
 
-	mockProxy := &mockProxyService{}
-	mockBrowser := &mockBrowserOpener{}
+	tempDir := t.TempDir()
+	storage, _ := forwarding.NewJSONStorage(filepath.Join(tempDir, "forwardings.json"))
+	fwdSvc, _ := forwarding.NewService(storage, log)
+	dialer := forwarding.NewDirectDialer()
 
-	uc := NewConnectUseCase(mockCloud, mockTS, mockProxy, mockBrowser, log)
+	uc := NewConnectUseCase(mockCloud, mockTS, fwdSvc, dialer, log)
 	err := uc.Execute(context.Background(), "bad-token")
 	if err == nil {
 		t.Fatal("expected error, got nil")

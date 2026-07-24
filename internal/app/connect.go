@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"cloud-client/internal/browser"
 	"cloud-client/internal/cloud"
-	"cloud-client/internal/proxy"
+	"cloud-client/internal/forwarding"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
 )
@@ -14,23 +13,23 @@ import (
 type ConnectUseCase struct {
 	cloudClient cloud.CloudClient
 	tsService   tailscale.TailscaleService
-	proxySvc    proxy.ProxyService
-	browser     browser.Opener
+	fwdService  forwarding.ForwardingService
+	dialer      forwarding.Dialer
 	logger      *logger.Logger
 }
 
 func NewConnectUseCase(
 	cloudClient cloud.CloudClient,
 	tsService tailscale.TailscaleService,
-	proxySvc proxy.ProxyService,
-	browserOpener browser.Opener,
+	fwdService forwarding.ForwardingService,
+	dialer forwarding.Dialer,
 	log *logger.Logger,
 ) *ConnectUseCase {
 	return &ConnectUseCase{
 		cloudClient: cloudClient,
 		tsService:   tsService,
-		proxySvc:    proxySvc,
-		browser:     browserOpener,
+		fwdService:  fwdService,
+		dialer:      dialer,
 		logger:      log,
 	}
 }
@@ -59,33 +58,28 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 
 	uc.logger.Info("Connection confirmed")
 	uc.logger.Info("")
-	uc.logger.Info("Starting local reverse proxy...")
+	uc.logger.Info("Starting local forwardings...")
 
-	localURL, err := uc.proxySvc.Start(resp.Hostname)
-	if err != nil {
-		return fmt.Errorf("failed to start local proxy: %w", err)
+	if err := uc.fwdService.StartAll(resp.Hostname, uc.dialer); err != nil {
+		return fmt.Errorf("failed to start forwardings: %w", err)
 	}
 
-	uc.logger.Info("")
-	uc.logger.Info("Listening on:")
-	uc.logger.Info("%s", localURL)
-	uc.logger.Info("")
-	uc.logger.Info("Forward target:")
-	uc.logger.Info("%s", uc.proxySvc.TargetURL())
-	uc.logger.Info("")
-
-	if uc.browser != nil {
-		uc.logger.Info("Opening browser...")
-		if err := uc.browser.Open(localURL); err != nil {
-			uc.logger.Error("Failed to open browser: %v", err)
+	uc.logger.Info("Active forwardings:")
+	for _, item := range uc.fwdService.List() {
+		status := "Inativo"
+		if item.Running {
+			status = "Ativo"
+		} else if item.LastError != "" {
+			status = "Erro: " + item.LastError
 		}
+		uc.logger.Info("  - %s (%d -> %d): %s", item.Forwarding.Name, item.Forwarding.RemotePort, item.Forwarding.LocalPort, status)
 	}
+	uc.logger.Info("")
+	uc.logger.Info("Forwardings ready.")
 
-	uc.logger.Info("Proxy ready.")
-
-	// Keep proxy active until context is canceled or signal received
+	// Keep active until context is canceled
 	<-ctx.Done()
-	_ = uc.proxySvc.Stop(context.Background())
+	_ = uc.fwdService.StopAll()
 
 	return nil
 }

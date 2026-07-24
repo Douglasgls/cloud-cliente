@@ -11,9 +11,9 @@ import (
 	"cloud-client/internal/cli"
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/config"
+	"cloud-client/internal/forwarding"
 	"cloud-client/internal/gui"
 	"cloud-client/internal/gui/controller"
-	"cloud-client/internal/proxy"
 	"cloud-client/internal/runtime"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
@@ -28,7 +28,18 @@ func main() {
 		runtimeMgr := runtime.NewManager(log)
 		cloudClient := cloud.NewClient(cfg, log)
 		tsService := tailscale.NewService(runtimeMgr)
-		proxyService := proxy.NewService(log, runtimeMgr.Socks5Addr())
+
+		storage, err := forwarding.NewJSONStorage("")
+		if err != nil {
+			log.Error("Error initializing storage: %v", err)
+			os.Exit(1)
+		}
+		fwdService, err := forwarding.NewService(storage, log)
+		if err != nil {
+			log.Error("Error initializing forwarding service: %v", err)
+			os.Exit(1)
+		}
+		dialer := forwarding.NewSocks5Dialer(runtimeMgr.Socks5Addr(), log)
 		browserOpener := browser.New()
 
 		ctrl := controller.NewConnectController(
@@ -37,7 +48,8 @@ func main() {
 			runtimeMgr,
 			cloudClient,
 			tsService,
-			proxyService,
+			fwdService,
+			dialer,
 			browserOpener,
 		)
 
@@ -72,12 +84,22 @@ func main() {
 
 	cloudClient := cloud.NewClient(cfg, log)
 	tsService := tailscale.NewService(runtimeMgr)
-	proxyService := proxy.NewService(log, runtimeMgr.Socks5Addr())
-	browserOpener := browser.New()
+
+	storage, err := forwarding.NewJSONStorage("")
+	if err != nil {
+		log.Error("Error initializing storage: %v", err)
+		os.Exit(1)
+	}
+	fwdService, err := forwarding.NewService(storage, log)
+	if err != nil {
+		log.Error("Error initializing forwarding service: %v", err)
+		os.Exit(1)
+	}
+	dialer := forwarding.NewSocks5Dialer(runtimeMgr.Socks5Addr(), log)
 
 	switch cmd.Name {
 	case "connect":
-		connectUC := app.NewConnectUseCase(cloudClient, tsService, proxyService, browserOpener, log)
+		connectUC := app.NewConnectUseCase(cloudClient, tsService, fwdService, dialer, log)
 		if err := connectUC.Execute(ctx, cmd.Token); err != nil && err != context.Canceled {
 			log.Error("Error: %v", err)
 			os.Exit(1)

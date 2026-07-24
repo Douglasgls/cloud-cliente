@@ -8,15 +8,13 @@ import (
 	"cloud-client/internal/browser"
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/config"
-	"cloud-client/internal/proxy"
+	"cloud-client/internal/forwarding"
 	"cloud-client/internal/runtime"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
 )
 
 type ConnectionInfo struct {
-	LocalURL     string
-	TargetHost   string
 	ConnectionID string
 	Hostname     string
 }
@@ -27,7 +25,8 @@ type ConnectController struct {
 	runtimeMgr  runtime.RuntimeManager
 	cloudClient cloud.CloudClient
 	tsService   tailscale.TailscaleService
-	proxySvc    proxy.ProxyService
+	fwdService  forwarding.ForwardingService
+	dialer      forwarding.Dialer
 	browser     browser.Opener
 
 	mu            sync.Mutex
@@ -42,7 +41,8 @@ func NewConnectController(
 	runtimeMgr runtime.RuntimeManager,
 	cloudClient cloud.CloudClient,
 	tsService tailscale.TailscaleService,
-	proxySvc proxy.ProxyService,
+	fwdService forwarding.ForwardingService,
+	dialer forwarding.Dialer,
 	browserOpener browser.Opener,
 ) *ConnectController {
 	return &ConnectController{
@@ -51,7 +51,8 @@ func NewConnectController(
 		runtimeMgr:  runtimeMgr,
 		cloudClient: cloudClient,
 		tsService:   tsService,
-		proxySvc:    proxySvc,
+		fwdService:  fwdService,
+		dialer:      dialer,
 		browser:     browserOpener,
 	}
 }
@@ -66,6 +67,45 @@ func (c *ConnectController) GetConnectionInfo() *ConnectionInfo {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.currentInfo
+}
+
+func (c *ConnectController) ForwardingService() forwarding.ForwardingService {
+	return c.fwdService
+}
+
+func (c *ConnectController) ListForwardings() []forwarding.ForwardingState {
+	if c.fwdService == nil {
+		return nil
+	}
+	return c.fwdService.List()
+}
+
+func (c *ConnectController) AddForwarding(name string, remotePort, localPort int) (forwarding.Forwarding, error) {
+	if c.fwdService == nil {
+		return forwarding.Forwarding{}, fmt.Errorf("forwarding service not available")
+	}
+	return c.fwdService.Add(name, remotePort, localPort)
+}
+
+func (c *ConnectController) UpdateForwarding(f forwarding.Forwarding) error {
+	if c.fwdService == nil {
+		return fmt.Errorf("forwarding service not available")
+	}
+	return c.fwdService.Update(f)
+}
+
+func (c *ConnectController) DeleteForwarding(id string) error {
+	if c.fwdService == nil {
+		return fmt.Errorf("forwarding service not available")
+	}
+	return c.fwdService.Delete(id)
+}
+
+func (c *ConnectController) ToggleForwarding(id string, enabled bool) error {
+	if c.fwdService == nil {
+		return fmt.Errorf("forwarding service not available")
+	}
+	return c.fwdService.Toggle(id, enabled)
 }
 
 func (c *ConnectController) ConnectAsync(
@@ -137,25 +177,19 @@ func (c *ConnectController) ConnectAsync(
 			return
 		}
 
-		report("Criando proxy...")
-		localURL, err := c.proxySvc.Start(resp.Hostname)
-		if err != nil {
-			if onError != nil {
-				onError(fmt.Errorf("falha ao iniciar proxy: %w", err))
+		report("Iniciando serviços...")
+		if c.fwdService != nil && c.dialer != nil {
+			if err := c.fwdService.StartAll(resp.Hostname, c.dialer); err != nil {
+				if onError != nil {
+					onError(fmt.Errorf("falha ao iniciar serviços: %w", err))
+				}
+				return
 			}
-			return
-		}
-
-		report("Abrindo navegador...")
-		if c.browser != nil {
-			_ = c.browser.Open(localURL)
 		}
 
 		report("✓ Conectado")
 
 		info := &ConnectionInfo{
-			LocalURL:     localURL,
-			TargetHost:   c.proxySvc.TargetURL(),
 			ConnectionID: resp.ConnectionID.String(),
 			Hostname:     resp.Hostname,
 		}
@@ -180,8 +214,8 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 		c.cancelConnect = nil
 	}
 
-	if c.proxySvc != nil {
-		_ = c.proxySvc.Stop(ctx)
+	if c.fwdService != nil {
+		_ = c.fwdService.StopAll()
 	}
 
 	c.isConnected = false
