@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -82,11 +83,74 @@ func (a *App) notifyForwardingsChanged() {
 	}
 }
 
-func (a *App) HasSession() bool {
+func (a *App) HasSessions() bool {
 	if a.sessionSvc == nil {
 		return false
 	}
 	return a.sessionSvc.HasSession()
+}
+
+func (a *App) HasSession() bool {
+	return a.HasSessions()
+}
+
+func (a *App) ListSessions() []SessionDTO {
+	if a.sessionSvc == nil {
+		return []SessionDTO{}
+	}
+
+	sessions, err := a.sessionSvc.List()
+	if err != nil {
+		return []SessionDTO{}
+	}
+
+	var currentConn *controller.ConnectionInfo
+	var isConnected bool
+	if a.ctrl != nil {
+		currentConn = a.ctrl.GetConnectionInfo()
+		isConnected = a.ctrl.IsConnected()
+	}
+
+	dtos := make([]SessionDTO, len(sessions))
+	for i, s := range sessions {
+		isActive := isConnected && currentConn != nil &&
+			(currentConn.Hostname == s.Hostname || currentConn.ConnectionID == s.ID || s.ID == currentConn.Hostname)
+
+		dtos[i] = SessionDTO{
+			ID:            s.ID,
+			AccessToken:   s.AccessToken,
+			ContainerName: s.ContainerName,
+			Hostname:      s.Hostname,
+			TailscaleIP:   s.TailscaleIP,
+			CreatedAt:     s.CreatedAt.Format(time.RFC3339),
+			LastUsedAt:    s.LastUsedAt.Format(time.RFC3339),
+			IsActive:      isActive,
+		}
+	}
+	return dtos
+}
+
+func (a *App) ReconnectSession(id string) error {
+	if a.sessionSvc == nil {
+		return fmt.Errorf("serviço de sessão não disponível")
+	}
+
+	sess, err := a.sessionSvc.Get(id)
+	if err != nil || sess.AccessToken == "" {
+		return fmt.Errorf("sessão não encontrada")
+	}
+
+	return a.Connect(sess.AccessToken)
+}
+
+func (a *App) ForgetSession(id string) error {
+	if a.ctrl != nil {
+		return a.ctrl.ForgetSession(id)
+	}
+	if a.sessionSvc != nil {
+		return a.sessionSvc.DeleteSession(id)
+	}
+	return nil
 }
 
 func (a *App) DeleteSession() error {

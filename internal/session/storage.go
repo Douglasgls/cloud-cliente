@@ -10,6 +10,8 @@ import (
 )
 
 type Storage interface {
+	LoadAll() ([]Session, error)
+	SaveAll(sessions []Session) error
 	Load() (*Session, error)
 	Save(sess *Session) error
 	Delete() error
@@ -53,7 +55,7 @@ func (s *JSONStorage) Exists() bool {
 	return !info.IsDir() && info.Size() > 0
 }
 
-func (s *JSONStorage) Load() (*Session, error) {
+func (s *JSONStorage) LoadAll() ([]Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -62,29 +64,38 @@ func (s *JSONStorage) Load() (*Session, error) {
 		return nil, fmt.Errorf("failed to read session file: %w", err)
 	}
 
-	var sess Session
-	if err := json.Unmarshal(data, &sess); err != nil {
-		return nil, fmt.Errorf("failed to parse session JSON: %w", err)
+	if len(data) == 0 {
+		return []Session{}, nil
 	}
 
-	if sess.AccessToken == "" {
-		return nil, fmt.Errorf("session file contains empty access token")
+	var sessions []Session
+	if err := json.Unmarshal(data, &sessions); err == nil {
+		return sessions, nil
 	}
 
-	return &sess, nil
+	// Try legacy single session unmarshal for backward compatibility
+	var single Session
+	if err := json.Unmarshal(data, &single); err == nil && single.AccessToken != "" {
+		if single.ID == "" {
+			if single.Hostname != "" {
+				single.ID = single.Hostname
+			} else {
+				single.ID = "default"
+			}
+		}
+		return []Session{single}, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse session JSON")
 }
 
-func (s *JSONStorage) Save(sess *Session) error {
+func (s *JSONStorage) SaveAll(sessions []Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if sess == nil || sess.AccessToken == "" {
-		return fmt.Errorf("cannot save nil or empty session")
-	}
-
-	data, err := json.MarshalIndent(sess, "", "  ")
+	data, err := json.MarshalIndent(sessions, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal session: %w", err)
+		return fmt.Errorf("failed to marshal sessions: %w", err)
 	}
 
 	tmpFile := s.filePath + ".tmp"
@@ -97,6 +108,53 @@ func (s *JSONStorage) Save(sess *Session) error {
 	}
 
 	return nil
+}
+
+func (s *JSONStorage) Load() (*Session, error) {
+	sessions, err := s.LoadAll()
+	if err != nil || len(sessions) == 0 {
+		if err != nil {
+			return nil, err
+		}
+		return nil, fmt.Errorf("no sessions found")
+	}
+
+	// Find most recently used session
+	var mostRecent *Session
+	for i := range sessions {
+		if mostRecent == nil || sessions[i].LastUsedAt.After(mostRecent.LastUsedAt) {
+			mostRecent = &sessions[i]
+		}
+	}
+	return mostRecent, nil
+}
+
+func (s *JSONStorage) Save(sess *Session) error {
+	if sess == nil || sess.AccessToken == "" {
+		return fmt.Errorf("cannot save nil or empty session")
+	}
+
+	sessions, _ := s.LoadAll()
+	if sessions == nil {
+		sessions = []Session{}
+	}
+
+	updated := false
+	for i, existing := range sessions {
+		if (sess.ID != "" && existing.ID == sess.ID) ||
+			(sess.Hostname != "" && existing.Hostname == sess.Hostname) ||
+			existing.AccessToken == sess.AccessToken {
+			sessions[i] = *sess
+			updated = true
+			break
+		}
+	}
+
+	if !updated {
+		sessions = append(sessions, *sess)
+	}
+
+	return s.SaveAll(sessions)
 }
 
 func (s *JSONStorage) Delete() error {

@@ -44,6 +44,32 @@ export namespace bridge {
 	        this.last_error = source["last_error"];
 	    }
 	}
+	export class SessionDTO {
+	    id: string;
+	    access_token: string;
+	    container_name: string;
+	    hostname: string;
+	    tailscale_ip: string;
+	    created_at: string;
+	    last_used_at: string;
+	    is_active: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SessionDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.access_token = source["access_token"];
+	        this.container_name = source["container_name"];
+	        this.hostname = source["hostname"];
+	        this.tailscale_ip = source["tailscale_ip"];
+	        this.created_at = source["created_at"];
+	        this.last_used_at = source["last_used_at"];
+	        this.is_active = source["is_active"];
+	    }
+	}
 
 }
 

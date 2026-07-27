@@ -30,17 +30,22 @@ type ForwardingService interface {
 	Delete(id string) error
 	Toggle(id string, enabled bool) error
 
+	SwitchSession(sessionID string) error
+	DeleteSessionForwardings(sessionID string) error
+	ActiveSessionID() string
+
 	StartAll(targetHost string, dialer Dialer) error
 	StopAll() error
 	IsConnected() bool
 }
 
 type Service struct {
-	storage    ForwardingStorage
-	log        *logger.Logger
-	items      []Forwarding
-	proxies    map[string]*TCPProxy
-	lastErrors map[string]string
+	storage         ForwardingStorage
+	log             *logger.Logger
+	activeSessionID string
+	items           []Forwarding
+	proxies         map[string]*TCPProxy
+	lastErrors      map[string]string
 
 	targetHost string
 	dialer     Dialer
@@ -50,17 +55,19 @@ type Service struct {
 }
 
 func NewService(storage ForwardingStorage, log *logger.Logger) (*Service, error) {
-	items, err := storage.Load()
+	initialSessionID := "default"
+	items, err := storage.Load(initialSessionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load forwardings: %w", err)
 	}
 
 	return &Service{
-		storage:    storage,
-		log:        log,
-		items:      items,
-		proxies:    make(map[string]*TCPProxy),
-		lastErrors: make(map[string]string),
+		storage:         storage,
+		log:             log,
+		activeSessionID: initialSessionID,
+		items:           items,
+		proxies:         make(map[string]*TCPProxy),
+		lastErrors:      make(map[string]string),
 	}, nil
 }
 
@@ -97,6 +104,57 @@ func (s *Service) notifyError(id string, err error) {
 	for _, l := range s.listeners {
 		l.OnForwardingError(id, err)
 	}
+}
+
+func (s *Service) ActiveSessionID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.activeSessionID
+}
+
+func (s *Service) SwitchSession(sessionID string) error {
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	s.mu.Lock()
+	if s.activeSessionID == sessionID && len(s.items) > 0 {
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
+
+	_ = s.StopAll()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	items, err := s.storage.Load(sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to load forwardings for session %s: %w", sessionID, err)
+	}
+
+	s.activeSessionID = sessionID
+	s.items = items
+	s.lastErrors = make(map[string]string)
+	return nil
+}
+
+func (s *Service) DeleteSessionForwardings(sessionID string) error {
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	s.mu.Lock()
+	if s.activeSessionID == sessionID {
+		s.mu.Unlock()
+		_ = s.StopAll()
+		s.mu.Lock()
+		s.items = DefaultForwardings()
+	}
+	s.mu.Unlock()
+
+	return s.storage.Delete(sessionID)
 }
 
 func (s *Service) IsConnected() bool {
@@ -167,7 +225,7 @@ func (s *Service) Add(name string, remotePort, localPort int) (Forwarding, error
 	}
 
 	s.items = append(s.items, item)
-	if err := s.storage.Save(s.items); err != nil {
+	if err := s.storage.Save(s.activeSessionID, s.items); err != nil {
 		s.items = s.items[:len(s.items)-1]
 		s.mu.Unlock()
 		return Forwarding{}, err
@@ -218,7 +276,7 @@ func (s *Service) Update(f Forwarding) error {
 	}
 
 	s.items[idx] = f
-	if err := s.storage.Save(s.items); err != nil {
+	if err := s.storage.Save(s.activeSessionID, s.items); err != nil {
 		s.items[idx] = existing
 		s.mu.Unlock()
 		return err
@@ -259,7 +317,7 @@ func (s *Service) Delete(id string) error {
 	deletedItem := s.items[idx]
 	s.items = append(s.items[:idx], s.items[idx+1:]...)
 
-	if err := s.storage.Save(s.items); err != nil {
+	if err := s.storage.Save(s.activeSessionID, s.items); err != nil {
 		s.items = append(s.items[:idx], append([]Forwarding{deletedItem}, s.items[idx:]...)...)
 		s.mu.Unlock()
 		return err
@@ -288,7 +346,7 @@ func (s *Service) Toggle(id string, enabled bool) error {
 	s.items[idx].Enabled = enabled
 	item := s.items[idx]
 
-	if err := s.storage.Save(s.items); err != nil {
+	if err := s.storage.Save(s.activeSessionID, s.items); err != nil {
 		s.items[idx].Enabled = !enabled
 		s.mu.Unlock()
 		return err

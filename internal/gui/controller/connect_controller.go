@@ -74,6 +74,31 @@ func (c *ConnectController) HasSession() bool {
 	return c.sessionSvc != nil && c.sessionSvc.HasSession()
 }
 
+func (c *ConnectController) ListSessions() ([]session.Session, error) {
+	if c.sessionSvc == nil {
+		return []session.Session{}, nil
+	}
+	return c.sessionSvc.List()
+}
+
+func (c *ConnectController) ForgetSession(id string) error {
+	c.mu.Lock()
+	if c.currentInfo != nil && (c.currentInfo.Hostname == id || c.currentInfo.ConnectionID == id) {
+		c.mu.Unlock()
+		_ = c.Disconnect(context.Background())
+	} else {
+		c.mu.Unlock()
+	}
+
+	if c.fwdService != nil {
+		_ = c.fwdService.DeleteSessionForwardings(id)
+	}
+	if c.sessionSvc != nil {
+		return c.sessionSvc.DeleteSession(id)
+	}
+	return nil
+}
+
 func (c *ConnectController) DeleteSession() error {
 	if c.sessionSvc == nil {
 		return nil
@@ -149,6 +174,30 @@ func (c *ConnectController) ReconnectAsync(
 	c.ConnectAsync(sess.AccessToken, onProgress, onSuccess, onError)
 }
 
+func (c *ConnectController) ReconnectSessionAsync(
+	sessionID string,
+	onProgress func(step string),
+	onSuccess func(info *ConnectionInfo),
+	onError func(err error),
+) {
+	if c.sessionSvc == nil {
+		if onError != nil {
+			onError(fmt.Errorf("Serviço de sessão indisponível"))
+		}
+		return
+	}
+
+	sess, err := c.sessionSvc.Get(sessionID)
+	if err != nil || sess.AccessToken == "" {
+		if onError != nil {
+			onError(fmt.Errorf("Falha ao carregar sessão salva: %v", err))
+		}
+		return
+	}
+
+	c.ConnectAsync(sess.AccessToken, onProgress, onSuccess, onError)
+}
+
 func (c *ConnectController) ConnectAsync(
 	token string,
 	onProgress func(step string),
@@ -207,6 +256,27 @@ func (c *ConnectController) ConnectAsync(
 			return
 		}
 
+		containerName := resp.ContainerName
+		if containerName == "" {
+			containerName = resp.Name
+		}
+		if containerName == "" {
+			containerName = resp.Hostname
+		}
+
+		sessionID := resp.Hostname
+		if sessionID == "" {
+			sessionID = resp.ConnectionID.String()
+		}
+
+		if c.fwdService != nil {
+			_ = c.fwdService.SwitchSession(sessionID)
+		}
+
+		if c.sessionSvc != nil {
+			_, _ = c.sessionSvc.SaveWithDetails(token, containerName, resp.Hostname, resp.TailscaleIP)
+		}
+
 		report("Executando Tailscale...")
 		if err := c.tsService.Up(ctx, resp.LoginServer, resp.PreauthKey, resp.Hostname); err != nil {
 			if onError != nil {
@@ -221,10 +291,6 @@ func (c *ConnectController) ConnectAsync(
 				onError(fmt.Errorf("falha na confirmação: %w", err))
 			}
 			return
-		}
-
-		if c.sessionSvc != nil {
-			_ = c.sessionSvc.Save(token)
 		}
 
 		report("Iniciando serviços...")
@@ -272,10 +338,6 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 
 	if c.fwdService != nil {
 		_ = c.fwdService.StopAll()
-	}
-
-	if c.sessionSvc != nil {
-		_ = c.sessionSvc.Delete()
 	}
 
 	c.isConnected = false

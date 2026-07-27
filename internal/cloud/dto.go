@@ -43,6 +43,8 @@ type ConnectResponse struct {
 	TailscaleIPv6 string     `json:"tailscale_ipv6,omitempty"`
 	ConnectionID  FlexibleID `json:"connection_id"`
 	ExpiresAt     string     `json:"expires_at,omitempty"`
+	ContainerName string     `json:"container_name,omitempty"`
+	Name          string     `json:"name,omitempty"`
 }
 
 type ConnectApiResponse struct {

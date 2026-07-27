@@ -12,13 +12,14 @@ const {
   isConnected,
   isConnecting,
   hasSession,
+  sessions,
   stepMessage,
   errorMessage,
   connectionInfo,
   connect,
-  reconnect,
-  disconnect,
-  checkSession
+  reconnectSession,
+  forgetSession,
+  disconnect
 } = useConnection()
 
 const {
@@ -32,17 +33,6 @@ const {
   copyText,
   openAppURL
 } = useForwardings()
-
-import { DeleteSession } from './wailsjs/go/bridge/App'
-
-const handleNewSession = async () => {
-  try {
-    await DeleteSession()
-  } catch (e) {
-    console.error(e)
-  }
-  hasSession.value = false
-}
 </script>
 
 <template>
@@ -76,10 +66,11 @@ const handleNewSession = async () => {
       <ConnectView
         v-else
         :has-session="hasSession"
+        :sessions="sessions"
         :error-message="errorMessage"
         @connect="connect"
-        @reconnect="reconnect"
-        @new-session="handleNewSession"
+        @reconnect-session="reconnectSession"
+        @forget-session="forgetSession"
       />
     </main>
 

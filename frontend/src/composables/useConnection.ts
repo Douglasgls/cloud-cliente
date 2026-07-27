@@ -1,8 +1,10 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import {
   HasSession,
+  ListSessions,
   Connect,
-  Reconnect,
+  ReconnectSession,
+  ForgetSession,
   Disconnect,
   GetConnectionInfo,
   IsConnected
@@ -14,14 +16,17 @@ export function useConnection() {
   const isConnected = ref(false)
   const isConnecting = ref(false)
   const hasSession = ref(false)
+  const sessions = ref<bridge.SessionDTO[]>([])
   const stepMessage = ref('')
   const errorMessage = ref('')
   const connectionInfo = ref<bridge.ConnectionInfoDTO>(new bridge.ConnectionInfoDTO())
 
-  const checkSession = async () => {
+  const fetchSessions = async () => {
     try {
-      hasSession.value = await HasSession()
+      sessions.value = await ListSessions()
+      hasSession.value = sessions.value.length > 0
     } catch (e) {
+      sessions.value = []
       hasSession.value = false
     }
   }
@@ -46,32 +51,41 @@ export function useConnection() {
       await Connect(token)
       isConnected.value = true
       connectionInfo.value = await GetConnectionInfo()
-      hasSession.value = true
+      await fetchSessions()
     } catch (err: any) {
       errorMessage.value = typeof err === 'string' ? err : (err.message || 'Erro ao conectar')
       isConnected.value = false
-      await checkSession()
+      await fetchSessions()
     } finally {
       isConnecting.value = false
     }
   }
 
-  const handleReconnect = async () => {
+  const handleReconnectSession = async (id: string) => {
     isConnecting.value = true
     errorMessage.value = ''
     stepMessage.value = 'Reconectando...'
 
     try {
-      await Reconnect()
+      await ReconnectSession(id)
       isConnected.value = true
       connectionInfo.value = await GetConnectionInfo()
-      hasSession.value = true
+      await fetchSessions()
     } catch (err: any) {
       errorMessage.value = typeof err === 'string' ? err : (err.message || 'Erro ao reconectar')
       isConnected.value = false
-      await checkSession()
+      await fetchSessions()
     } finally {
       isConnecting.value = false
+    }
+  }
+
+  const handleForgetSession = async (id: string) => {
+    try {
+      await ForgetSession(id)
+      await fetchSessions()
+    } catch (e) {
+      console.error('Error forgetting session:', e)
     }
   }
 
@@ -83,13 +97,13 @@ export function useConnection() {
     } finally {
       isConnected.value = false
       connectionInfo.value = new bridge.ConnectionInfoDTO()
-      hasSession.value = false
       errorMessage.value = ''
+      await fetchSessions()
     }
   }
 
   onMounted(() => {
-    checkSession()
+    fetchSessions()
     checkStatus()
 
     EventsOn('connection_progress', (step: string) => {
@@ -101,6 +115,7 @@ export function useConnection() {
       if (connected) {
         connectionInfo.value = await GetConnectionInfo()
       }
+      await fetchSessions()
     })
   })
 
@@ -113,12 +128,15 @@ export function useConnection() {
     isConnected,
     isConnecting,
     hasSession,
+    sessions,
     stepMessage,
     errorMessage,
     connectionInfo,
-    checkSession,
+    checkSession: fetchSessions,
+    fetchSessions,
     connect: handleConnect,
-    reconnect: handleReconnect,
+    reconnectSession: handleReconnectSession,
+    forgetSession: handleForgetSession,
     disconnect: handleDisconnect
   }
 }

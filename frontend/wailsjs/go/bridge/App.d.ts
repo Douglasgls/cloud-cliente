@@ -10,19 +10,29 @@ export function CopyToClipboard(arg1:string):Promise<void>;
 
 export function DeleteForwarding(arg1:string):Promise<void>;
 
+export function DeleteSession():Promise<void>;
+
 export function Disconnect():Promise<void>;
+
+export function ForgetSession(arg1:string):Promise<void>;
 
 export function GetConnectionInfo():Promise<bridge.ConnectionInfoDTO>;
 
 export function HasSession():Promise<boolean>;
 
+export function HasSessions():Promise<boolean>;
+
 export function IsConnected():Promise<boolean>;
 
 export function ListForwardings():Promise<Array<bridge.ForwardingDTO>>;
 
+export function ListSessions():Promise<Array<bridge.SessionDTO>>;
+
 export function OpenURL(arg1:string):Promise<void>;
 
 export function Reconnect():Promise<void>;
+
+export function ReconnectSession(arg1:string):Promise<void>;
 
 export function ToggleForwarding(arg1:string,arg2:boolean):Promise<void>;
 

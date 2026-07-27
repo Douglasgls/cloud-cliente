@@ -74,3 +74,61 @@ func TestSessionService_SaveLoadTouchDelete(t *testing.T) {
 		t.Errorf("Expected HasSession() to be false after Delete()")
 	}
 }
+
+func TestSessionService_MultiSession(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "session.json")
+
+	storage, err := NewJSONStorage(filePath)
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+
+	service := NewService(storage)
+
+	// Save Container A
+	sessA, err := service.SaveWithDetails("token-a", "Container A", "ct-100", "100.64.0.1")
+	if err != nil {
+		t.Fatalf("Failed to save session A: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Save Container B
+	sessB, err := service.SaveWithDetails("token-b", "Container B", "ct-101", "100.64.0.2")
+	if err != nil {
+		t.Fatalf("Failed to save session B: %v", err)
+	}
+
+	list, err := service.List()
+	if err != nil {
+		t.Fatalf("Failed to list sessions: %v", err)
+	}
+
+	if len(list) != 2 {
+		t.Fatalf("Expected 2 sessions, got %d", len(list))
+	}
+
+	// Most recent session should be Container B
+	if list[0].ID != sessB.ID {
+		t.Errorf("Expected most recent session to be %s, got %s", sessB.ID, list[0].ID)
+	}
+
+	// Delete Container A
+	if err := service.DeleteSession(sessA.ID); err != nil {
+		t.Fatalf("Failed to delete session A: %v", err)
+	}
+
+	listAfterDelete, err := service.List()
+	if err != nil {
+		t.Fatalf("Failed to list sessions after delete: %v", err)
+	}
+
+	if len(listAfterDelete) != 1 {
+		t.Fatalf("Expected 1 session after delete, got %d", len(listAfterDelete))
+	}
+
+	if listAfterDelete[0].ID != sessB.ID {
+		t.Errorf("Expected remaining session to be %s, got %s", sessB.ID, listAfterDelete[0].ID)
+	}
+}

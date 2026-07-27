@@ -9,8 +9,11 @@ import (
 )
 
 type ForwardingStorage interface {
-	Load() ([]Forwarding, error)
-	Save(items []Forwarding) error
+	Load(sessionID string) ([]Forwarding, error)
+	Save(sessionID string, items []Forwarding) error
+	Delete(sessionID string) error
+	LoadLegacy() ([]Forwarding, error)
+	SaveLegacy(items []Forwarding) error
 }
 
 type JSONStorage struct {
@@ -39,42 +42,39 @@ func (s *JSONStorage) FilePath() string {
 	return s.filePath
 }
 
-func (s *JSONStorage) Load() ([]Forwarding, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *JSONStorage) readAllMapLocked() (map[string][]Forwarding, error) {
 	data, err := os.ReadFile(s.filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			defaults := DefaultForwardings()
-			if err := s.saveLocked(defaults); err != nil {
-				return nil, err
-			}
-			return defaults, nil
+			return make(map[string][]Forwarding), nil
 		}
 		return nil, fmt.Errorf("failed to read forwardings file %s: %w", s.filePath, err)
 	}
 
-	var items []Forwarding
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, fmt.Errorf("failed to parse forwardings JSON: %w", err)
+	if len(data) == 0 {
+		return make(map[string][]Forwarding), nil
 	}
 
-	// Ensure default services (ssh, http, https) are present
-	items = mergeDefaults(items)
-	return items, nil
+	var allMap map[string][]Forwarding
+	if err := json.Unmarshal(data, &allMap); err == nil {
+		return allMap, nil
+	}
+
+	// Legacy format: JSON array
+	var legacyItems []Forwarding
+	if err := json.Unmarshal(data, &legacyItems); err == nil {
+		allMap = make(map[string][]Forwarding)
+		allMap["default"] = legacyItems
+		return allMap, nil
+	}
+
+	return nil, fmt.Errorf("failed to parse forwardings JSON")
 }
 
-func (s *JSONStorage) Save(items []Forwarding) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.saveLocked(items)
-}
-
-func (s *JSONStorage) saveLocked(items []Forwarding) error {
-	data, err := json.MarshalIndent(items, "", "  ")
+func (s *JSONStorage) saveAllMapLocked(allMap map[string][]Forwarding) error {
+	data, err := json.MarshalIndent(allMap, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal forwardings: %w", err)
+		return fmt.Errorf("failed to marshal forwardings map: %w", err)
 	}
 
 	tmpFile := s.filePath + ".tmp"
@@ -87,6 +87,73 @@ func (s *JSONStorage) saveLocked(items []Forwarding) error {
 	}
 
 	return nil
+}
+
+func (s *JSONStorage) Load(sessionID string) ([]Forwarding, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	allMap, err := s.readAllMapLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	items, exists := allMap[sessionID]
+	if !exists {
+		items = DefaultForwardings()
+		allMap[sessionID] = items
+		_ = s.saveAllMapLocked(allMap)
+		return items, nil
+	}
+
+	items = mergeDefaults(items)
+	return items, nil
+}
+
+func (s *JSONStorage) Save(sessionID string, items []Forwarding) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	allMap, err := s.readAllMapLocked()
+	if err != nil {
+		allMap = make(map[string][]Forwarding)
+	}
+
+	allMap[sessionID] = items
+	return s.saveAllMapLocked(allMap)
+}
+
+func (s *JSONStorage) Delete(sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if sessionID == "" {
+		sessionID = "default"
+	}
+
+	allMap, err := s.readAllMapLocked()
+	if err != nil {
+		return nil
+	}
+
+	delete(allMap, sessionID)
+	return s.saveAllMapLocked(allMap)
+}
+
+func (s *JSONStorage) LoadLegacy() ([]Forwarding, error) {
+	return s.Load("default")
+}
+
+func (s *JSONStorage) SaveLegacy(items []Forwarding) error {
+	return s.Save("default", items)
 }
 
 func mergeDefaults(existing []Forwarding) []Forwarding {

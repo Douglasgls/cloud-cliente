@@ -22,12 +22,20 @@ export function Disconnect() {
   return window['go']['bridge']['App']['Disconnect']();
 }
 
+export function ForgetSession(arg1) {
+  return window['go']['bridge']['App']['ForgetSession'](arg1);
+}
+
 export function GetConnectionInfo() {
   return window['go']['bridge']['App']['GetConnectionInfo']();
 }
 
 export function HasSession() {
   return window['go']['bridge']['App']['HasSession']();
+}
+
+export function HasSessions() {
+  return window['go']['bridge']['App']['HasSessions']();
 }
 
 export function IsConnected() {
@@ -38,12 +46,20 @@ export function ListForwardings() {
   return window['go']['bridge']['App']['ListForwardings']();
 }
 
+export function ListSessions() {
+  return window['go']['bridge']['App']['ListSessions']();
+}
+
 export function OpenURL(arg1) {
   return window['go']['bridge']['App']['OpenURL'](arg1);
 }
 
 export function Reconnect() {
   return window['go']['bridge']['App']['Reconnect']();
+}
+
+export function ReconnectSession(arg1) {
+  return window['go']['bridge']['App']['ReconnectSession'](arg1);
 }
 
 export function ToggleForwarding(arg1, arg2) {

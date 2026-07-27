@@ -54,6 +54,30 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 	}
 
 	uc.logger.Info("Authorization received")
+
+	containerName := resp.ContainerName
+	if containerName == "" {
+		containerName = resp.Name
+	}
+	if containerName == "" {
+		containerName = resp.Hostname
+	}
+
+	sessionID := resp.Hostname
+	if sessionID == "" {
+		sessionID = resp.ConnectionID.String()
+	}
+
+	if uc.fwdService != nil {
+		_ = uc.fwdService.SwitchSession(sessionID)
+	}
+
+	if uc.sessionSvc != nil {
+		if _, err := uc.sessionSvc.SaveWithDetails(token, containerName, resp.Hostname, resp.TailscaleIP); err != nil {
+			uc.logger.Error("Failed to save session: %v", err)
+		}
+	}
+
 	uc.logger.Info("Executing tailscale...")
 
 	err = uc.tsService.Up(ctx, resp.LoginServer, resp.PreauthKey, resp.Hostname)
@@ -64,12 +88,6 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 	_, err = uc.cloudClient.Confirm(ctx, resp.ConnectionID.String())
 	if err != nil {
 		return fmt.Errorf("failed to confirm connection: %w", err)
-	}
-
-	if uc.sessionSvc != nil {
-		if err := uc.sessionSvc.Save(token); err != nil {
-			uc.logger.Error("Failed to save session: %v", err)
-		}
 	}
 
 	uc.logger.Info("Connection confirmed")

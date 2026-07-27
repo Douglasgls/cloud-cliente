@@ -94,6 +94,41 @@ func TestService_CRUD(t *testing.T) {
 	}
 }
 
+func TestService_SwitchSession(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "forwardings.json")
+
+	storage, _ := NewJSONStorage(filePath)
+	service, _ := NewService(storage, nil)
+
+	// Switch to container-a and add Redis
+	_ = service.SwitchSession("container-a")
+	_, err := service.Add("Redis", 6379, 6379)
+	if err != nil {
+		t.Fatalf("Failed to add Redis to container-a: %v", err)
+	}
+
+	if len(service.List()) != 4 {
+		t.Errorf("Expected 4 items for container-a, got %d", len(service.List()))
+	}
+
+	// Switch to container-b
+	_ = service.SwitchSession("container-b")
+
+	// Container B should have only 3 default items
+	itemsB := service.List()
+	if len(itemsB) != 3 {
+		t.Errorf("Expected 3 default items for container-b, got %d", len(itemsB))
+	}
+
+	// Switch back to container-a
+	_ = service.SwitchSession("container-a")
+	itemsA := service.List()
+	if len(itemsA) != 4 {
+		t.Errorf("Expected 4 items when switching back to container-a, got %d", len(itemsA))
+	}
+}
+
 func TestService_StartStopAll(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "forwardings.json")
