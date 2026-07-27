@@ -12,7 +12,9 @@ import {
   Terminal,
   Globe,
   Lock,
-  Layers
+  Layers,
+  RefreshCw,
+  AlertCircle
 } from '@lucide/vue'
 
 import Card from '../ui/Card.vue'
@@ -26,6 +28,8 @@ import { bridge } from '../../wailsjs/go/models'
 const props = defineProps<{
   connectionInfo: bridge.ConnectionInfoDTO
   forwardings: bridge.ForwardingDTO[]
+  isReconnecting?: boolean
+  stepMessage?: string
 }>()
 
 const emit = defineEmits<{
@@ -87,7 +91,16 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
   <div class="h-full flex flex-col overflow-hidden bg-zinc-950">
 
     <!-- Header Connection Info Banner -->
-    <div class="p-6 pb-4">
+    <div class="p-6 pb-4 space-y-3">
+      <!-- Reconnecting Banner -->
+      <div v-if="isReconnecting" class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 text-amber-400 animate-pulse">
+        <RefreshCw class="w-4 h-4 animate-spin text-amber-400 shrink-0" />
+        <div class="text-xs">
+          <p class="font-bold">Conexão instável com a internet</p>
+          <p class="text-[11px] text-amber-300/80">{{ stepMessage || 'Reconectando ao container...' }}</p>
+        </div>
+      </div>
+
       <Card class="border-indigo-500/20 bg-gradient-to-r from-zinc-900/90 via-zinc-900/60 to-indigo-950/20">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-800/80">
 
@@ -162,15 +175,19 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
                   <Lock v-else-if="srv.id === 'https'" class="w-4 h-4 text-indigo-400" />
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold text-zinc-100 mb-12">{{ srv.name }}</span>
+                    <span class="text-sm font-bold text-zinc-100">{{ srv.name }}</span>
                     <StatusBadge :status="getStatusType(srv)" :label="srv.last_error ? 'Erro ao iniciar' : undefined" />
                   </div>
                   <p class="text-xs text-zinc-400 font-mono">
                     Remota: <span class="text-zinc-200">{{ srv.remote_port }}</span>
                     <span class="text-zinc-600 mx-1.5">➔</span>
                     Local: <span class="text-indigo-300 font-semibold">{{ srv.local_port }}</span>
+                  </p>
+                  <p v-if="srv.last_error" class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ srv.last_error }}</span>
                   </p>
                 </div>
               </div>
@@ -249,7 +266,7 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
                   @update:model-value="(val) => emit('toggleForwarding', { id: srv.id, enabled: val })"
                 />
 
-                <div class="space-y-3">
+                <div class="space-y-1">
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-bold text-zinc-100">{{ srv.name }}</span>
                     <StatusBadge :status="getStatusType(srv)" :label="srv.last_error ? 'Erro ao iniciar' : undefined" />
@@ -258,6 +275,10 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
                     Remota: <span class="text-zinc-200">{{ srv.remote_port }}</span>
                     <span class="text-zinc-600 mx-1.5">➔</span>
                     Local: <span class="text-emerald-300 font-semibold">{{ srv.local_port }}</span>
+                  </p>
+                  <p v-if="srv.last_error" class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+                    <span>{{ srv.last_error }}</span>
                   </p>
                 </div>
               </div>

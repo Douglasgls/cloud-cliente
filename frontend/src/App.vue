@@ -11,6 +11,7 @@ import { useForwardings } from './composables/useForwardings'
 const {
   isConnected,
   isConnecting,
+  isReconnecting,
   hasSession,
   sessions,
   stepMessage,
@@ -53,6 +54,8 @@ const {
         v-else-if="isConnected"
         :connection-info="connectionInfo"
         :forwardings="forwardings"
+        :is-reconnecting="isReconnecting"
+        :step-message="stepMessage"
         @disconnect="disconnect"
         @add-forwarding="(p) => addForwarding(p.name, p.remotePort, p.localPort)"
         @update-forwarding="(p) => updateForwarding(p.id, p.name, p.remotePort, p.localPort, p.enabled)"

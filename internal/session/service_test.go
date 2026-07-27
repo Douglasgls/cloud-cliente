@@ -1,6 +1,7 @@
 package session
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -130,5 +131,46 @@ func TestSessionService_MultiSession(t *testing.T) {
 
 	if listAfterDelete[0].ID != sessB.ID {
 		t.Errorf("Expected remaining session to be %s, got %s", sessB.ID, listAfterDelete[0].ID)
+	}
+}
+
+func TestSessionStorage_CorruptedFallback(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "session.json")
+
+	storage, err := NewJSONStorage(filePath)
+	if err != nil {
+		t.Fatalf("Failed to create storage: %v", err)
+	}
+
+	service := NewService(storage)
+	_, err = service.SaveWithDetails("token-123", "Container Test", "ct-200", "100.64.0.10")
+	if err != nil {
+		t.Fatalf("Failed to save session: %v", err)
+	}
+
+	// Second save to trigger backup creation
+	if _, err := service.SaveWithDetails("token-456", "Container Test Updated", "ct-200", "100.64.0.10"); err != nil {
+		t.Fatalf("Failed to update session: %v", err)
+	}
+
+	bakPath := filePath + ".bak"
+	if _, err := os.Stat(bakPath); err != nil {
+		t.Fatalf("Expected backup file %s to exist", bakPath)
+	}
+
+	// Corrupt main file
+	if err := os.WriteFile(filePath, []byte("{ invalid json..."), 0644); err != nil {
+		t.Fatalf("Failed to write corrupted file: %v", err)
+	}
+
+	// LoadAll should restore from .bak
+	sessions, err := storage.LoadAll()
+	if err != nil {
+		t.Fatalf("Expected LoadAll to succeed using backup file, got error: %v", err)
+	}
+
+	if len(sessions) != 1 || sessions[0].AccessToken != "token-123" {
+		t.Fatalf("Expected restored session token-123 from backup, got %+v", sessions)
 	}
 }

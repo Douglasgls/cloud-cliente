@@ -3,6 +3,7 @@ package session
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -50,7 +51,11 @@ func (s *JSONStorage) Exists() bool {
 
 	info, err := os.Stat(s.filePath)
 	if err != nil {
-		return false
+		bakInfo, bakErr := os.Stat(s.filePath + ".bak")
+		if bakErr != nil {
+			return false
+		}
+		return !bakInfo.IsDir() && bakInfo.Size() > 0
 	}
 	return !info.IsDir() && info.Size() > 0
 }
@@ -60,8 +65,14 @@ func (s *JSONStorage) LoadAll() ([]Session, error) {
 	defer s.mu.Unlock()
 
 	data, err := os.ReadFile(s.filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read session file: %w", err)
+	if err != nil || len(data) == 0 {
+		// Attempt to load from backup file if main file is missing or empty
+		bakData, bakErr := os.ReadFile(s.filePath + ".bak")
+		if bakErr == nil && len(bakData) > 0 {
+			data = bakData
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to read session file: %w", err)
+		}
 	}
 
 	if len(data) == 0 {
@@ -86,6 +97,14 @@ func (s *JSONStorage) LoadAll() ([]Session, error) {
 		return []Session{single}, nil
 	}
 
+	// If unmarshal failed, attempt fallback to .bak if we haven't tried it yet
+	bakData, bakErr := os.ReadFile(s.filePath + ".bak")
+	if bakErr == nil && len(bakData) > 0 && string(bakData) != string(data) {
+		if err := json.Unmarshal(bakData, &sessions); err == nil {
+			return sessions, nil
+		}
+	}
+
 	return nil, fmt.Errorf("failed to parse session JSON")
 }
 
@@ -98,16 +117,7 @@ func (s *JSONStorage) SaveAll(sessions []Session) error {
 		return fmt.Errorf("failed to marshal sessions: %w", err)
 	}
 
-	tmpFile := s.filePath + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0600); err != nil {
-		return fmt.Errorf("failed to write session tmp file: %w", err)
-	}
-
-	if err := os.Rename(tmpFile, s.filePath); err != nil {
-		return fmt.Errorf("failed to rename session file: %w", err)
-	}
-
-	return nil
+	return atomicWriteWithBackup(s.filePath, data, 0600)
 }
 
 func (s *JSONStorage) Load() (*Session, error) {
@@ -161,6 +171,7 @@ func (s *JSONStorage) Delete() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	_ = os.Remove(s.filePath + ".bak")
 	if err := os.Remove(s.filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete session file: %w", err)
 	}
@@ -181,4 +192,60 @@ func getDefaultSessionPath() (string, error) {
 	}
 
 	return filepath.Join(home, ".cloud-client", "session.json"), nil
+}
+
+func atomicWriteWithBackup(filePath string, data []byte, perm os.FileMode) error {
+	bakFile := filePath + ".bak"
+	tmpFile := filePath + ".tmp"
+
+	f, err := os.OpenFile(tmpFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return fmt.Errorf("failed to open tmp file: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to write tmp file: %w", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to sync tmp file to disk: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to close tmp file: %w", err)
+	}
+
+	if info, err := os.Stat(filePath); err == nil && info.Size() > 0 {
+		_ = copyFileContents(filePath, bakFile)
+	}
+
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		return fmt.Errorf("failed to rename tmp file: %w", err)
+	}
+
+	return nil
+}
+
+func copyFileContents(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }

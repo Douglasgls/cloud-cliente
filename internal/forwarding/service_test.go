@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -170,5 +171,48 @@ func TestService_StartStopAll(t *testing.T) {
 
 	if service.IsConnected() {
 		t.Errorf("Expected service to be disconnected")
+	}
+}
+
+func TestService_PortConflictDetection(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "forwardings.json")
+
+	storage, _ := NewJSONStorage(filePath)
+	service, err := NewService(storage, nil)
+	if err != nil {
+		t.Fatalf("Failed to create service: %v", err)
+	}
+
+	listener := NewTestListener()
+	service.Subscribe(listener)
+
+	// Occupy test port with an active TCP listener
+	ln, err := net.Listen("tcp", "127.0.0.1:49123")
+	if err != nil {
+		t.Fatalf("Failed to listen on test port: %v", err)
+	}
+	defer ln.Close()
+
+	// Add service mapped to port 49123
+	fwd, err := service.Add("Conflict Test", 80, 49123)
+	if err != nil {
+		t.Fatalf("Failed to add forwarding: %v", err)
+	}
+
+	dialer := &MockDialer{}
+	_ = service.StartAll("100.64.0.1", dialer)
+
+	st, err := service.Get(fwd.ID)
+	if err != nil {
+		t.Fatalf("Failed to get forwarding state: %v", err)
+	}
+
+	if st.Running {
+		t.Errorf("Expected proxy start to fail due to port conflict")
+	}
+
+	if st.LastError == "" || !strings.Contains(st.LastError, "já está em uso por outro programa") {
+		t.Errorf("Expected friendly port in use error message, got: %s", st.LastError)
 	}
 }

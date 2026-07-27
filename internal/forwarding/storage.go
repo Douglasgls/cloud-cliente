@@ -3,6 +3,7 @@ package forwarding
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -44,11 +45,16 @@ func (s *JSONStorage) FilePath() string {
 
 func (s *JSONStorage) readAllMapLocked() (map[string][]Forwarding, error) {
 	data, err := os.ReadFile(s.filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return make(map[string][]Forwarding), nil
+	if err != nil || len(data) == 0 {
+		bakData, bakErr := os.ReadFile(s.filePath + ".bak")
+		if bakErr == nil && len(bakData) > 0 {
+			data = bakData
+		} else if err != nil {
+			if os.IsNotExist(err) {
+				return make(map[string][]Forwarding), nil
+			}
+			return nil, fmt.Errorf("failed to read forwardings file %s: %w", s.filePath, err)
 		}
-		return nil, fmt.Errorf("failed to read forwardings file %s: %w", s.filePath, err)
 	}
 
 	if len(data) == 0 {
@@ -68,6 +74,14 @@ func (s *JSONStorage) readAllMapLocked() (map[string][]Forwarding, error) {
 		return allMap, nil
 	}
 
+	// Try backup file if main unmarshal failed
+	bakData, bakErr := os.ReadFile(s.filePath + ".bak")
+	if bakErr == nil && len(bakData) > 0 && string(bakData) != string(data) {
+		if err := json.Unmarshal(bakData, &allMap); err == nil {
+			return allMap, nil
+		}
+	}
+
 	return nil, fmt.Errorf("failed to parse forwardings JSON")
 }
 
@@ -77,16 +91,7 @@ func (s *JSONStorage) saveAllMapLocked(allMap map[string][]Forwarding) error {
 		return fmt.Errorf("failed to marshal forwardings map: %w", err)
 	}
 
-	tmpFile := s.filePath + ".tmp"
-	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write temporary file: %w", err)
-	}
-
-	if err := os.Rename(tmpFile, s.filePath); err != nil {
-		return fmt.Errorf("failed to replace forwardings file: %w", err)
-	}
-
-	return nil
+	return atomicWriteWithBackup(s.filePath, data, 0644)
 }
 
 func (s *JSONStorage) Load(sessionID string) ([]Forwarding, error) {
@@ -174,4 +179,60 @@ func mergeDefaults(existing []Forwarding) []Forwarding {
 	}
 
 	return result
+}
+
+func atomicWriteWithBackup(filePath string, data []byte, perm os.FileMode) error {
+	bakFile := filePath + ".bak"
+	tmpFile := filePath + ".tmp"
+
+	f, err := os.OpenFile(tmpFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return fmt.Errorf("failed to open tmp file: %w", err)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to write tmp file: %w", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to sync tmp file to disk: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpFile)
+		return fmt.Errorf("failed to close tmp file: %w", err)
+	}
+
+	if info, err := os.Stat(filePath); err == nil && info.Size() > 0 {
+		_ = copyFileContents(filePath, bakFile)
+	}
+
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		return fmt.Errorf("failed to rename tmp file: %w", err)
+	}
+
+	return nil
+}
+
+func copyFileContents(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }

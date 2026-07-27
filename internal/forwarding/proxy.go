@@ -76,7 +76,7 @@ func (p *TCPProxy) Start() error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		p.mu.Unlock()
-		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+		return formatListenError(p.localPort, err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -249,4 +249,15 @@ func isEOFOrClosed(err error) bool {
 		return true
 	}
 	return strings.Contains(err.Error(), "use of closed network connection")
+}
+
+func formatListenError(localPort int, err error) error {
+	if err == nil {
+		return nil
+	}
+	errStr := err.Error()
+	if strings.Contains(errStr, "address already in use") || strings.Contains(errStr, "only one usage of each socket address") || strings.Contains(errStr, "EADDRINUSE") {
+		return fmt.Errorf("A porta local %d já está em uso por outro programa no seu computador.", localPort)
+	}
+	return fmt.Errorf("falha ao iniciar escuta na porta local %d: %w", localPort, err)
 }

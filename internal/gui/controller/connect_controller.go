@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
+	"time"
 
 	"cloud-client/internal/browser"
 	"cloud-client/internal/cloud"
@@ -34,10 +36,17 @@ type ConnectController struct {
 	sessionSvc  session.SessionService
 	browser     browser.Opener
 
-	mu            sync.Mutex
-	isConnected   bool
-	currentInfo   *ConnectionInfo
-	cancelConnect context.CancelFunc
+	mu              sync.Mutex
+	isConnected     bool
+	isReconnecting  bool
+	status          string
+	targetIP        string
+	lastLoginServer string
+	lastAuthKey     string
+	lastHostname    string
+	currentInfo     *ConnectionInfo
+	cancelConnect   context.CancelFunc
+	cancelMonitor   context.CancelFunc
 }
 
 func NewConnectController(
@@ -61,6 +70,7 @@ func NewConnectController(
 		dialer:      dialer,
 		sessionSvc:  sessionSvc,
 		browser:     browserOpener,
+		status:      "disconnected",
 	}
 }
 
@@ -318,8 +328,22 @@ func (c *ConnectController) ConnectAsync(
 
 		c.mu.Lock()
 		c.isConnected = true
+		c.isReconnecting = false
+		c.status = "connected"
 		c.currentInfo = info
+		c.targetIP = targetIP
+		c.lastLoginServer = resp.LoginServer
+		c.lastAuthKey = resp.PreauthKey
+		c.lastHostname = resp.Hostname
+
+		if c.cancelMonitor != nil {
+			c.cancelMonitor()
+		}
+		monCtx, cancelMon := context.WithCancel(context.Background())
+		c.cancelMonitor = cancelMon
 		c.mu.Unlock()
+
+		go c.startHealthMonitor(monCtx, report, onError)
 
 		if onSuccess != nil {
 			onSuccess(info)
@@ -327,9 +351,32 @@ func (c *ConnectController) ConnectAsync(
 	}()
 }
 
+func (c *ConnectController) Status() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.status == "" {
+		if c.isConnected {
+			return "connected"
+		}
+		return "disconnected"
+	}
+	return c.status
+}
+
+func (c *ConnectController) IsReconnecting() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.isReconnecting
+}
+
 func (c *ConnectController) Disconnect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	if c.cancelMonitor != nil {
+		c.cancelMonitor()
+		c.cancelMonitor = nil
+	}
 
 	if c.cancelConnect != nil {
 		c.cancelConnect()
@@ -341,8 +388,131 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 	}
 
 	c.isConnected = false
+	c.isReconnecting = false
+	c.status = "disconnected"
 	c.currentInfo = nil
 	return nil
+}
+
+func (c *ConnectController) startHealthMonitor(ctx context.Context, report func(step string), onError func(err error)) {
+	ticker := time.NewTicker(4 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			c.mu.Lock()
+			if !c.isConnected || c.isReconnecting {
+				c.mu.Unlock()
+				continue
+			}
+			targetIP := c.targetIP
+			dialer := c.dialer
+			loginServer := c.lastLoginServer
+			authKey := c.lastAuthKey
+			hostname := c.lastHostname
+			c.mu.Unlock()
+
+			if targetIP == "" || dialer == nil {
+				continue
+			}
+
+			// Perform dial test
+			dialCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			conn, err := dialer.DialContext(dialCtx, "tcp", net.JoinHostPort(targetIP, "22"))
+			cancel()
+
+			if err != nil {
+				if c.log != nil {
+					c.log.Error("[Monitor] Oscilação de rede detectada: %v. Iniciando auto-reconexão...", err)
+				}
+
+				c.mu.Lock()
+				c.isReconnecting = true
+				c.status = "reconnecting"
+				c.mu.Unlock()
+
+				report("Reconectando...")
+
+				reconnected := c.autoReconnectLoop(ctx, targetIP, loginServer, authKey, hostname, dialer, report)
+				if !reconnected {
+					if c.log != nil {
+						c.log.Error("[Monitor] Não foi possível restabelecer a conexão de rede.")
+					}
+					_ = c.Disconnect(ctx)
+					if onError != nil {
+						onError(fmt.Errorf("Conexão de rede perdida e não pôde ser restabelecida"))
+					}
+					return
+				}
+			} else {
+				conn.Close()
+			}
+		}
+	}
+}
+
+func (c *ConnectController) autoReconnectLoop(
+	ctx context.Context,
+	targetIP, loginServer, authKey, hostname string,
+	dialer forwarding.Dialer,
+	report func(step string),
+) bool {
+	backoff := 2 * time.Second
+	maxAttempts := 25
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(backoff):
+		}
+
+		c.mu.Lock()
+		if !c.isConnected {
+			c.mu.Unlock()
+			return false
+		}
+		c.mu.Unlock()
+
+		report(fmt.Sprintf("Reconectando... (%d/%d)", attempt, maxAttempts))
+
+		if c.tsService != nil && loginServer != "" {
+			_ = c.tsService.Up(ctx, loginServer, authKey, hostname)
+		}
+
+		dialCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		conn, err := dialer.DialContext(dialCtx, "tcp", net.JoinHostPort(targetIP, "22"))
+		cancel()
+
+		if err == nil {
+			conn.Close()
+			if c.log != nil {
+				c.log.Info("[Monitor] Conexão restabelecida com sucesso na tentativa %d!", attempt)
+			}
+
+			if c.fwdService != nil {
+				_ = c.fwdService.StartAll(targetIP, dialer)
+			}
+
+			c.mu.Lock()
+			c.isReconnecting = false
+			c.status = "connected"
+			c.mu.Unlock()
+
+			report("✓ Conectado")
+			return true
+		}
+
+		backoff *= 2
+		if backoff > 12*time.Second {
+			backoff = 12 * time.Second
+		}
+	}
+
+	return false
 }
 
 func (c *ConnectController) OpenBrowser(targetURL string) error {

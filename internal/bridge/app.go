@@ -167,6 +167,13 @@ func (a *App) IsConnected() bool {
 	return a.ctrl.IsConnected()
 }
 
+func (a *App) GetConnectionStatus() string {
+	if a.ctrl == nil {
+		return "disconnected"
+	}
+	return a.ctrl.Status()
+}
+
 func (a *App) GetConnectionInfo() ConnectionInfoDTO {
 	if a.ctrl == nil {
 		return ConnectionInfoDTO{}

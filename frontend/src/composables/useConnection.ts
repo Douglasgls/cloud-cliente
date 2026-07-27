@@ -15,6 +15,7 @@ import { bridge } from '../wailsjs/go/models'
 export function useConnection() {
   const isConnected = ref(false)
   const isConnecting = ref(false)
+  const isReconnecting = ref(false)
   const hasSession = ref(false)
   const sessions = ref<bridge.SessionDTO[]>([])
   const stepMessage = ref('')
@@ -44,6 +45,7 @@ export function useConnection() {
 
   const handleConnect = async (token: string) => {
     isConnecting.value = true
+    isReconnecting.value = false
     errorMessage.value = ''
     stepMessage.value = 'Iniciando conexão...'
 
@@ -63,6 +65,7 @@ export function useConnection() {
 
   const handleReconnectSession = async (id: string) => {
     isConnecting.value = true
+    isReconnecting.value = false
     errorMessage.value = ''
     stepMessage.value = 'Reconectando...'
 
@@ -96,6 +99,7 @@ export function useConnection() {
       console.error(e)
     } finally {
       isConnected.value = false
+      isReconnecting.value = false
       connectionInfo.value = new bridge.ConnectionInfoDTO()
       errorMessage.value = ''
       await fetchSessions()
@@ -108,12 +112,20 @@ export function useConnection() {
 
     EventsOn('connection_progress', (step: string) => {
       stepMessage.value = step
+      if (step.startsWith('Reconectando')) {
+        isReconnecting.value = true
+      } else if (step.startsWith('✓') || step.includes('Conectado')) {
+        isReconnecting.value = false
+      }
     })
 
     EventsOn('connection_state_changed', async (connected: boolean) => {
       isConnected.value = connected
       if (connected) {
         connectionInfo.value = await GetConnectionInfo()
+        isReconnecting.value = false
+      } else {
+        isReconnecting.value = false
       }
       await fetchSessions()
     })
@@ -127,6 +139,7 @@ export function useConnection() {
   return {
     isConnected,
     isConnecting,
+    isReconnecting,
     hasSession,
     sessions,
     stepMessage,
