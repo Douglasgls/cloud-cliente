@@ -18,6 +18,8 @@ export function ForgetSession(arg1:string):Promise<void>;
 
 export function GetConnectionInfo():Promise<bridge.ConnectionInfoDTO>;
 
+export function GetConnectionStatus():Promise<string>;
+
 export function HasSession():Promise<boolean>;
 
 export function HasSessions():Promise<boolean>;

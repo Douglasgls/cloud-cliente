@@ -34,6 +34,10 @@ export function GetConnectionInfo() {
   return window['go']['bridge']['App']['GetConnectionInfo']();
 }
 
+export function GetConnectionStatus() {
+  return window['go']['bridge']['App']['GetConnectionStatus']();
+}
+
 export function HasSession() {
   return window['go']['bridge']['App']['HasSession']();
 }
