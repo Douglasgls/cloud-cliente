@@ -51,6 +51,12 @@ Gera o executável standalone do Linux em `build/bin/cloud-client`:
 wails build
 ```
 
+### No Linux Pop_OS! ou qualquer outra distribuição que utilize WebKit2GTK 4.1.x
+Gera o executável standalone do Linux em `build/bin/cloud-client`:
+```bash
+wails build -tags webkit2_41
+```
+
 ### 🚀 Gerar Build de Compartilhamento (build-share)
 
 Para gerar uma build atualizada e copiá-la automaticamente para a pasta de compartilhamento (`build-share`), execute o script de build na raiz do projeto:
@@ -69,23 +75,6 @@ Este script irá:
 2. Criar a pasta `build-share` (se não existir).
 3. Copiar e atualizar o executável `cloud-client.exe` dentro da pasta `build-share/`.
 
----
-
-## 🐧 A Versão para Linux Ainda Funciona?
-
-**Sim, funciona perfeitamente!**
-
-### Como funciona nos bastidores:
-* As correções estruturais que fizemos no Named Pipe do Windows estão protegidas pelas tags de compilação condicional do Go (`//go:build windows`). 
-* No Linux, o sistema usa **Unix Sockets** em vez de Named Pipes. O Tailscaled no Linux não possui o comportamento do Windows de se auto-desligar quando o cliente fecha a conexão, portanto ele não precisa do serviço de "Anchor Connection" (que foi implementado como no-op no arquivo `anchor_other.go` para sistemas não-Windows).
-* O monitor de saúde foi otimizado de forma genérica no arquivo Go principal, o que significa que o Linux também se beneficia de uma checagem de saúde de rede muito mais estável, sem falsos-negativos e sem reconexões agressivas.
-
----
-
-## 🔍 Estrutura de Arquivos Importantes
-
-* [`main.go`](file:///c:/Users/dougl/Downloads/cloud-cliente-main/cloud-cliente-main/main.go): Ponto de entrada que inicializa a aplicação desktop (Wails) ou a versão CLI de terminal.
-* [`internal/runtime/`](file:///c:/Users/dougl/Downloads/cloud-cliente-main/cloud-cliente-main/internal/runtime): Gerenciamento do ciclo de vida dos binários `tailscale` e `tailscaled`.
-* [`internal/gui/controller/connect_controller.go`](file:///c:/Users/dougl/Downloads/cloud-cliente-main/cloud-cliente-main/internal/gui/controller/connect_controller.go): Controlador do fluxo de conexão, autenticação Headscale e monitoramento de saúde de rede.
-* [`internal/forwarding/`](file:///c:/Users/dougl/Downloads/cloud-cliente-main/cloud-cliente-main/internal/forwarding): Gerenciamento de proxies TCP locais e integração SOCKS5.
-* [`frontend/`](file:///c:/Users/dougl/Downloads/cloud-cliente-main/cloud-cliente-main/frontend): Interface gráfica da aplicação (React/JS/Vite).
+### rodar no windows
+- Baixe a pasta build-share
+- Rode o app cloud-client.exe
