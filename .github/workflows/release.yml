@@ -56,17 +56,25 @@ jobs:
       - name: Build App
         run: ${{ matrix.build_cmd }}
 
-      - name: Compress Binary (Linux)
+      - name: Package Release Assets (Linux)
         if: matrix.platform == 'linux'
         run: |
-          cd build/bin
-          zip -r ../../cloud-client-linux.zip *
+          mkdir -p release-dist
+          cp build/bin/cloud-client release-dist/
+          cp -r assets release-dist/
+          if [ -f .env ]; then cp .env release-dist/; else cp .env.example release-dist/.env; fi
+          cd release-dist
+          zip -r ../cloud-client-linux.zip *
 
-      - name: Compress Binary (Windows)
+      - name: Package Release Assets (Windows)
         if: matrix.platform == 'windows'
         shell: powershell
         run: |
-          Compress-Archive -Path build/bin/* -DestinationPath cloud-client-windows.zip
+          New-Item -ItemType Directory -Path release-dist -Force
+          Copy-Item -Path build/bin/cloud-client.exe -Destination release-dist/
+          Copy-Item -Path assets -Destination release-dist/ -Recurse
+          if (Test-Path .env) { Copy-Item -Path .env -Destination release-dist/ } else { Copy-Item -Path .env.example -Destination release-dist/.env }
+          Compress-Archive -Path release-dist/* -DestinationPath cloud-client-windows.zip
 
       - name: Release App Assets
         uses: softprops/action-gh-release@v2
