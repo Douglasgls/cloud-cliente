@@ -75,6 +75,45 @@ Este script irá:
 2. Criar a pasta `build-share` (se não existir).
 3. Copiar e atualizar o executável `cloud-client.exe` dentro da pasta `build-share/`.
 
-### rodar no windows
-- Baixe a pasta build-share
-- Rode o app cloud-client.exe
+---
+
+## 🏷️ Como publicar e instalar no Linux e Windows via GitHub Releases
+
+Como o **Wails** utiliza a interface nativa de cada sistema (WebKitGTK no Linux e WebView2 no Windows), o executável do Linux não roda no Windows e vice-versa. Por isso, geramos binários específicos para cada plataforma.
+
+### 1. Publicação Automática (GitHub Actions - Recomendado)
+O projeto já conta com um workflow automatizado em `.github/workflows/release.yml`. Para gerar os pacotes `.zip` de **Linux** e **Windows** automaticamente:
+
+1. Faça commit das suas alterações:
+   ```bash
+   git add .
+   git commit -m "feat: preparando versão v1.0.0"
+   ```
+2. Crie uma tag de versão e envie para o GitHub:
+   ```bash
+   git tag v1.0.0
+   git push origin main --tags
+   ```
+3. O GitHub irá compilar o app em um servidor Linux e em um servidor Windows e publicará os arquivos na aba **Releases** do repositório:
+   - `cloud-client-linux.zip`
+   - `cloud-client-windows.zip`
+
+### 2. Instruções de Instalação para Usuários
+
+#### 🐧 No Linux:
+1. Baixe o `cloud-client-linux.zip` na página de **Releases** do repositório.
+2. Descompacte o arquivo:
+   ```bash
+   unzip cloud-client-linux.zip -d cloud-client-linux
+   cd cloud-client-linux
+   ```
+3. Garanta permissão de execução e execute:
+   ```bash
+   chmod +x cloud-client
+   ./cloud-client
+   ```
+
+#### 🪟 No Windows:
+1. Baixe o `cloud-client-windows.zip` na página de **Releases** do repositório.
+2. Clique com o botão direito e selecione **Extrair Tudo...**.
+3. Abra a pasta extraída e dê duplo clique em `cloud-client.exe`.
