@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build (${{ matrix.os }})
@@ -13,7 +16,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: debian-latest
             platform: linux
             asset_name: cloud-client-linux.zip
             build_cmd: wails build -tags webkit2_41
@@ -35,6 +38,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
 
       - name: Install Linux Dependencies
         if: matrix.platform == 'linux'
