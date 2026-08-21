@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: debian-latest
+          - os: ubuntu-latest
             platform: linux
             asset_name: cloud-client-linux.zip
             build_cmd: wails build -tags webkit2_41
