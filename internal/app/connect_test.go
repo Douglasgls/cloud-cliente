@@ -15,8 +15,9 @@ import (
 )
 
 type mockCloudClient struct {
-	connectFunc func(ctx context.Context, token string) (*cloud.ConnectResponse, error)
-	confirmFunc func(ctx context.Context, connectionID string) (*cloud.ConfirmResponse, error)
+	connectFunc             func(ctx context.Context, token string) (*cloud.ConnectResponse, error)
+	confirmFunc             func(ctx context.Context, connectionID string) (*cloud.ConfirmResponse, error)
+	getNetworkEndpointsFunc func(ctx context.Context, token string) (*cloud.EndpointsResponse, error)
 }
 
 func (m *mockCloudClient) Connect(ctx context.Context, token string) (*cloud.ConnectResponse, error) {
@@ -31,6 +32,13 @@ func (m *mockCloudClient) Confirm(ctx context.Context, connectionID string) (*cl
 		return m.confirmFunc(ctx, connectionID)
 	}
 	return nil, nil
+}
+
+func (m *mockCloudClient) GetNetworkEndpoints(ctx context.Context, token string) (*cloud.EndpointsResponse, error) {
+	if m.getNetworkEndpointsFunc != nil {
+		return m.getNetworkEndpointsFunc(ctx, token)
+	}
+	return &cloud.EndpointsResponse{Version: 1, Endpoints: nil}, nil
 }
 
 type mockTailscaleService struct {

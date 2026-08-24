@@ -66,3 +66,22 @@ type ErrorResponse struct {
 	Error   string `json:"error,omitempty"`
 	Message string `json:"message,omitempty"`
 }
+
+type NetworkPort struct {
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+}
+
+type NetworkEndpoint struct {
+	Hostname    string        `json:"hostname"`
+	FQDN        string        `json:"fqdn"`
+	TailscaleIP string        `json:"tailscale_ip"`
+	Status      string        `json:"status"`
+	Ports       []NetworkPort `json:"ports"`
+}
+
+type EndpointsResponse struct {
+	Version   int64             `json:"version"`
+	Endpoints []NetworkEndpoint `json:"endpoints"`
+}
+

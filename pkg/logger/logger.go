@@ -52,6 +52,15 @@ func (l *Logger) Error(msg string, args ...interface{}) {
 	}
 }
 
+func (l *Logger) Warn(msg string, args ...interface{}) {
+	prefix := "[WARN] "
+	if len(args) > 0 {
+		fmt.Fprintf(l.errOut, prefix+msg+"\n", args...)
+	} else {
+		fmt.Fprintln(l.errOut, prefix+msg)
+	}
+}
+
 func (l *Logger) Debug(msg string, args ...interface{}) {
 	if !l.debug {
 		return

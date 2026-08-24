@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/forwarding"
+	"cloud-client/internal/network"
 	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
 	"cloud-client/pkg/logger"
@@ -112,9 +114,17 @@ func (uc *ConnectUseCase) Execute(ctx context.Context, token string) error {
 	uc.logger.Info("")
 	uc.logger.Info("Forwardings ready.")
 
+	uc.logger.Info("Starting local DNS server and network discovery...")
+	netMgr := network.NewNetworkManager(uc.cloudClient, "127.0.0.1:53", 30*time.Second, uc.logger)
+	if err := netMgr.Start(ctx, token); err != nil {
+		uc.logger.Warn("Local DNS / Network Manager warning: %v", err)
+	}
+
 	// Keep active until context is canceled
 	<-ctx.Done()
+	_ = netMgr.Stop()
 	_ = uc.fwdService.StopAll()
 
 	return nil
 }
+
