@@ -14,6 +14,7 @@ import (
 	"cloud-client/internal/cloud"
 	"cloud-client/internal/config"
 	"cloud-client/internal/forwarding"
+	"cloud-client/internal/network"
 	"cloud-client/internal/runtime"
 	"cloud-client/internal/session"
 	"cloud-client/internal/tailscale"
@@ -49,6 +50,7 @@ type ConnectController struct {
 	currentInfo     *ConnectionInfo
 	cancelConnect   context.CancelFunc
 	cancelMonitor   context.CancelFunc
+	netMgr          *network.NetworkManager
 }
 
 func NewConnectController(
@@ -320,6 +322,14 @@ func (c *ConnectController) ConnectAsync(
 			}
 		}
 
+		report("Iniciando DNS local...")
+		netMgr := network.NewNetworkManager(c.cloudClient, "127.0.0.1:53", 30*time.Second, c.log)
+		if err := netMgr.Start(ctx, token); err != nil {
+			if c.log != nil {
+				c.log.Warn("Falha ao iniciar gerenciador de DNS local: %v", err)
+			}
+		}
+
 		report("✓ Conectado")
 
 		info := &ConnectionInfo{
@@ -330,6 +340,7 @@ func (c *ConnectController) ConnectAsync(
 		}
 
 		c.mu.Lock()
+		c.netMgr = netMgr
 		c.isConnected = true
 		c.isReconnecting = false
 		c.status = "connected"
@@ -384,6 +395,11 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 	if c.cancelConnect != nil {
 		c.cancelConnect()
 		c.cancelConnect = nil
+	}
+
+	if c.netMgr != nil {
+		_ = c.netMgr.Stop()
+		c.netMgr = nil
 	}
 
 	if c.fwdService != nil {

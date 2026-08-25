@@ -23,6 +23,7 @@ var (
 type CloudClient interface {
 	Connect(ctx context.Context, token string) (*ConnectResponse, error)
 	Confirm(ctx context.Context, connectionID string) (*ConfirmResponse, error)
+	GetNetworkEndpoints(ctx context.Context, token string) (*EndpointsResponse, error)
 }
 
 type Client struct {
@@ -180,3 +181,65 @@ func (c *Client) Confirm(ctx context.Context, connectionID string) (*ConfirmResp
 
 	return &confirmResp, nil
 }
+
+func (c *Client) GetNetworkEndpoints(ctx context.Context, token string) (*EndpointsResponse, error) {
+	url := c.baseURL + "/network/endpoints"
+	if c.logger != nil {
+		c.logger.Debug("HTTP GET %s", url)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrUnableToContactCloud, err)
+	}
+
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		if c.logger != nil {
+			c.logger.Debug("HTTP request error: %v", err)
+		}
+		return nil, fmt.Errorf("%w: %v", ErrUnableToContactCloud, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if c.logger != nil {
+		c.logger.Debug("HTTP Status: %d", resp.StatusCode)
+		c.logger.Debug("Response Body: %s", string(respBody))
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		if token != "" {
+			// Retry without authorization token to fetch global catalog
+			return c.GetNetworkEndpoints(ctx, "")
+		}
+		return nil, ErrInvalidToken
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp ErrorResponse
+		_ = json.Unmarshal(respBody, &errResp)
+		if errResp.Message != "" {
+			return nil, fmt.Errorf("%w: %s", ErrUnableToContactCloud, errResp.Message)
+		}
+		if errResp.Error != "" {
+			return nil, fmt.Errorf("%w: %s", ErrUnableToContactCloud, errResp.Error)
+		}
+		return nil, fmt.Errorf("%w: %s returned HTTP status %d", ErrUnableToContactCloud, url, resp.StatusCode)
+	}
+
+	var endpointsResp EndpointsResponse
+	if err := json.Unmarshal(respBody, &endpointsResp); err != nil {
+		return nil, fmt.Errorf("%w: invalid JSON response: %v", ErrUnableToContactCloud, err)
+	}
+
+	return &endpointsResp, nil
+}
+

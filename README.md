@@ -117,3 +117,10 @@ O projeto já conta com um workflow automatizado em `.github/workflows/release.y
 1. Baixe o `cloud-client-windows.zip` na página de **Releases** do repositório.
 2. Clique com o botão direito e selecione **Extrair Tudo...**.
 3. Abra a pasta extraída e dê duplo clique em `cloud-client.exe`.
+
+
+#### comando especial linux
+sudo setcap 'cap_net_bind_service=+ep' build/bin/cloud-client
+resolvectl status -> links de rede dns
+sudo resolvectl dns enp37s0 1.1.1.1 8.8.8.8
+resolvectl flush-caches
