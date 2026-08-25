@@ -18,11 +18,11 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            asset_name: cloud-client-linux.zip
+            asset_name: client-linux.zip
             build_cmd: wails build -tags webkit2_41
           - os: windows-latest
             platform: windows
-            asset_name: cloud-client-windows.zip
+            asset_name: client-windows.zip
             build_cmd: wails build
 
     steps:
@@ -64,7 +64,7 @@ jobs:
           cp -r assets release-dist/
           if [ -f .env ]; then cp .env release-dist/; else cp .env.example release-dist/.env; fi
           cd release-dist
-          zip -r ../cloud-client-linux.zip *
+          zip -r ../${{ matrix.asset_name }} *
 
       - name: Package Release Assets (Windows)
         if: matrix.platform == 'windows'
@@ -74,7 +74,7 @@ jobs:
           Copy-Item -Path build/bin/cloud-client.exe -Destination release-dist/
           Copy-Item -Path assets -Destination release-dist/ -Recurse
           if (Test-Path .env) { Copy-Item -Path .env -Destination release-dist/ } else { Copy-Item -Path .env.example -Destination release-dist/.env }
-          Compress-Archive -Path release-dist/* -DestinationPath cloud-client-windows.zip
+          Compress-Archive -Path release-dist/* -DestinationPath ${{ matrix.asset_name }}
 
       - name: Release App Assets
         uses: softprops/action-gh-release@v2

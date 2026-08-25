@@ -23,7 +23,7 @@ func (b *Browser) Open(targetURL string) error {
 	case "linux":
 		cmd = exec.Command("xdg-open", targetURL)
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", targetURL)
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", targetURL)
 	case "darwin":
 		cmd = exec.Command("open", targetURL)
 	default:

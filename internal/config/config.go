@@ -17,7 +17,7 @@ type Config struct {
 }
 
 const (
-	DefaultBaseURL = "http://192.168.0.181:7070"
+	DefaultBaseURL = "https://douglaspaz.site/api"
 	DefaultTimeout = 15 * time.Second
 	ClientName     = "cloud-client"
 	Version        = "0.1.0"

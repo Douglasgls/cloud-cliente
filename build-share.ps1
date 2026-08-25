@@ -29,4 +29,10 @@ if (-not (Test-Path $destFolder)) {
 Write-Host "Copying $srcPath to $destPath..." -ForegroundColor Yellow
 Copy-Item -Path $srcPath -Destination $destPath -Force
 
+# 5. Copy assets
+if (Test-Path "assets") {
+    Write-Host "Syncing assets to $destFolder/assets..." -ForegroundColor Yellow
+    Copy-Item -Path "assets" -Destination "$destFolder" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "Build completed and copied to build-share successfully!" -ForegroundColor Green
