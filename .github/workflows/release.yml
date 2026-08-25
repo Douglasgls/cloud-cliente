@@ -62,7 +62,6 @@ jobs:
           mkdir -p release-dist
           cp build/bin/cloud-client release-dist/
           cp -r assets release-dist/
-          if [ -f .env ]; then cp .env release-dist/; else cp .env.example release-dist/.env; fi
           cd release-dist
           zip -r ../${{ matrix.asset_name }} *
 
@@ -73,7 +72,6 @@ jobs:
           New-Item -ItemType Directory -Path release-dist -Force
           Copy-Item -Path build/bin/cloud-client.exe -Destination release-dist/
           Copy-Item -Path assets -Destination release-dist/ -Recurse
-          if (Test-Path .env) { Copy-Item -Path .env -Destination release-dist/ } else { Copy-Item -Path .env.example -Destination release-dist/.env }
           Compress-Archive -Path release-dist/* -DestinationPath ${{ matrix.asset_name }}
 
       - name: Release App Assets
