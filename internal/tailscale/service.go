@@ -38,6 +38,7 @@ func (s *Service) Up(ctx context.Context, loginServer, authKey, hostname string)
 		"--reset",         // clear previously saved non-default flags to avoid the
 		//                 // "must mention all non-default flags" error on reconnect
 		"--accept-dns=false", // always disable Tailscale DNS; traffic uses SOCKS5
+		"--force-reauth",     // force re-authentication when changing login-server or key
 	}
 	if loginServer != "" {
 		args = append(args, "--login-server="+loginServer)
