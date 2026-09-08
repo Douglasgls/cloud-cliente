@@ -9,7 +9,7 @@ defineProps<{
 <template>
   <header class="flex items-center justify-between px-6 py-4 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800/80 select-none">
     <div class="flex items-center gap-3">
-      <div class="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shadow-sm">
+      <div class="p-2 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 shadow-sm">
         <Cloud class="w-5 h-5" />
       </div>
       <div>

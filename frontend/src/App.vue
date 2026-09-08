@@ -37,7 +37,11 @@ const {
 </script>
 
 <template>
-  <div class="h-screen w-screen flex flex-col bg-zinc-950 text-zinc-100 overflow-hidden select-none">
+  <div class="h-screen w-screen flex flex-col bg-[#0B1120] text-slate-200 overflow-hidden select-none font-sans relative">
+    <!-- Mesh Background para LXC Connect -->
+    <div class="absolute inset-0 pointer-events-none z-0 opacity-40" style="background-image: radial-gradient(#334155 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
+    
+    <div class="relative z-10 flex flex-col h-full w-full">
     <!-- Header -->
     <Header :is-connected="isConnected" />
 
@@ -79,5 +83,6 @@ const {
 
     <!-- Toast Notification -->
     <Toast :show="showToast" :message="toastMessage" />
+    </div>
   </div>
 </template>

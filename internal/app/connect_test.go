@@ -43,13 +43,30 @@ func (m *mockCloudClient) GetNetworkEndpoints(ctx context.Context, token string)
 
 type mockTailscaleService struct {
 	upFunc      func(ctx context.Context, loginServer, authKey, hostname string) error
+	downFunc    func(ctx context.Context) error
+	logoutFunc  func(ctx context.Context) error
 	statusFunc  func(ctx context.Context) (string, error)
 	versionFunc func(ctx context.Context) (string, error)
+	ipFunc      func(ctx context.Context) (string, error)
 }
 
 func (m *mockTailscaleService) Up(ctx context.Context, loginServer, authKey, hostname string) error {
 	if m.upFunc != nil {
 		return m.upFunc(ctx, loginServer, authKey, hostname)
+	}
+	return nil
+}
+
+func (m *mockTailscaleService) Down(ctx context.Context) error {
+	if m.downFunc != nil {
+		return m.downFunc(ctx)
+	}
+	return nil
+}
+
+func (m *mockTailscaleService) Logout(ctx context.Context) error {
+	if m.logoutFunc != nil {
+		return m.logoutFunc(ctx)
 	}
 	return nil
 }
@@ -64,6 +81,13 @@ func (m *mockTailscaleService) Status(ctx context.Context) (string, error) {
 func (m *mockTailscaleService) Version(ctx context.Context) (string, error) {
 	if m.versionFunc != nil {
 		return m.versionFunc(ctx)
+	}
+	return "", nil
+}
+
+func (m *mockTailscaleService) IP(ctx context.Context) (string, error) {
+	if m.ipFunc != nil {
+		return m.ipFunc(ctx)
 	}
 	return "", nil
 }

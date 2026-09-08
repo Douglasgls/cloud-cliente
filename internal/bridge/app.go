@@ -69,6 +69,15 @@ func (a *App) Startup(ctx context.Context) {
 	}
 }
 
+func (a *App) Shutdown(ctx context.Context) {
+	if a.ctrl != nil {
+		_ = a.ctrl.Disconnect(ctx)
+	}
+	if a.runtimeMgr != nil {
+		_ = a.runtimeMgr.StopDaemon()
+	}
+}
+
 type bridgeListener struct {
 	app *App
 }
@@ -183,10 +192,11 @@ func (a *App) GetConnectionInfo() ConnectionInfoDTO {
 		return ConnectionInfoDTO{}
 	}
 	return ConnectionInfoDTO{
-		ConnectionID:  info.ConnectionID,
-		Hostname:      info.Hostname,
-		TailscaleIP:   info.TailscaleIP,
-		TailscaleIPv6: info.TailscaleIPv6,
+		ConnectionID:      info.ConnectionID,
+		Hostname:          info.Hostname,
+		TailscaleIP:       info.TailscaleIP,
+		TailscaleIPv6:     info.TailscaleIPv6,
+		ClientTailscaleIP: info.ClientTailscaleIP,
 	}
 }
 
