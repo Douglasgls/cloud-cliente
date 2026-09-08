@@ -82,13 +82,13 @@ const getStatusType = (srv: bridge.ForwardingDTO) => {
   return 'error'
 }
 
-const getSSHCommand = (localPort: number) => `ssh root@127.0.0.1 -p ${localPort}`
-const getHTTPURL = (localPort: number) => `http://127.0.0.1:${localPort}`
-const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
+const getSSHCommand = (localPort: number) => `ssh root@${props.connectionInfo.hostname}.interno -p ${localPort}`
+const getHTTPURL = (localPort: number) => `http://${props.connectionInfo.hostname}.interno:${localPort}`
+const getHTTPSURL = (localPort: number) => `https://${props.connectionInfo.hostname}.interno:${localPort}`
 </script>
 
 <template>
-  <div class="h-full flex flex-col overflow-hidden bg-zinc-950">
+  <div class="h-full flex flex-col overflow-hidden bg-transparent">
 
     <!-- Header Connection Info Banner -->
     <div class="p-6 pb-4 space-y-3">
@@ -101,19 +101,28 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
         </div>
       </div>
 
-      <Card class="border-indigo-500/20 bg-gradient-to-r from-zinc-900/90 via-zinc-900/60 to-indigo-950/20">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-zinc-800/80">
+      <Card class="border-brand-500/20 bg-slate-900/50 backdrop-blur-md shadow-2xl shadow-brand-500/10">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-800/80">
 
           <!-- Container Name -->
           <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
               <Server class="w-5 h-5" />
             </div>
             <div>
-              <p class="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">Container</p>
-              <h2 class="text-sm font-bold text-zinc-100 truncate">
-                {{ connectionInfo.hostname || connectionInfo.connection_id || 'Container Conectado' }}
+              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="Nome do Container">Container</p>
+              <h2 class="text-sm font-bold text-slate-100 truncate">
+                {{ connectionInfo.hostname || connectionInfo.connection_id || 'Conectado' }}
               </h2>
+              <div 
+                v-if="connectionInfo.hostname"
+                class="flex items-center gap-1 mt-0.5 group cursor-pointer" 
+                @click="emit('copyText', `${connectionInfo.hostname}.interno`, 'URL Base copiada!')" 
+                title="Copiar URL Base"
+              >
+                <p class="text-[11px] text-brand-400 font-mono">{{ connectionInfo.hostname }}.interno</p>
+                <Copy class="w-3 h-3 text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
           </div>
 
@@ -123,9 +132,22 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
               <Network class="w-5 h-5" />
             </div>
             <div>
-              <p class="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">IP Tailscale</p>
+              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="IP do Container Remoto">Container IP</p>
               <h2 class="text-sm font-mono font-bold text-emerald-400">
                 {{ connectionInfo.tailscale_ip || '-' }}
+              </h2>
+            </div>
+          </div>
+
+          <!-- Local Tailscale IP -->
+          <div class="flex items-center gap-3 sm:pl-4 pt-3 sm:pt-0">
+            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+              <Globe class="w-5 h-5" />
+            </div>
+            <div>
+              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="Seu IP Local na Rede Tailscale">Client IP</p>
+              <h2 class="text-sm font-mono font-bold text-brand-400">
+                {{ connectionInfo.client_tailscale_ip || '-' }}
               </h2>
             </div>
           </div>
@@ -133,8 +155,8 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
           <!-- Connection Status / ID -->
           <div class="flex items-center justify-between sm:pl-4 pt-3 sm:pt-0">
             <div>
-              <p class="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">ID da Conexão</p>
-              <h2 class="text-xs font-mono font-semibold text-zinc-300 truncate max-w-[140px]">
+              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="ID único da conexão atual">ID da Conexão</p>
+              <h2 class="text-xs font-mono font-semibold text-slate-300 truncate max-w-[140px]">
                 {{ connectionInfo.connection_id || '-' }}
               </h2>
             </div>
@@ -154,12 +176,12 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
       <!-- Default Services -->
       <div class="space-y-3">
         <div class="flex items-center gap-2">
-          <Layers class="w-4 h-4 text-indigo-400" />
-          <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Serviços Padrão</h3>
+          <Layers class="w-4 h-4 text-brand-400" />
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Serviços Padrão</h3>
         </div>
 
         <div class="grid grid-cols-1 gap-3">
-          <Card v-for="srv in defaultServices" :key="srv.id" class="p-4 hover:border-zinc-700/80">
+          <Card v-for="srv in defaultServices" :key="srv.id" class="p-4 bg-slate-900/40 backdrop-blur-sm border-slate-800/80 hover:border-brand-500/40 hover:shadow-brand-500/5 hover:shadow-lg transition-all duration-300">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
               <!-- Info & Status -->
@@ -169,21 +191,21 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
                   @update:model-value="(val) => emit('toggleForwarding', { id: srv.id, enabled: val })"
                 />
 
-                <div class="p-2 rounded-lg bg-zinc-800/80 text-zinc-300">
+                <div class="p-2 rounded-lg bg-slate-800/80 text-slate-300">
                   <Terminal v-if="srv.id === 'ssh'" class="w-4 h-4 text-emerald-400" />
                   <Globe v-else-if="srv.id === 'http'" class="w-4 h-4 text-sky-400" />
-                  <Lock v-else-if="srv.id === 'https'" class="w-4 h-4 text-indigo-400" />
+                  <Lock v-else-if="srv.id === 'https'" class="w-4 h-4 text-brand-400" />
                 </div>
 
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold text-zinc-100">{{ srv.name }}</span>
+                    <span class="text-sm font-bold text-slate-100">{{ srv.name }}</span>
                     <StatusBadge :status="getStatusType(srv)" :label="srv.last_error ? 'Erro ao iniciar' : undefined" />
                   </div>
-                  <p class="text-xs text-zinc-400 font-mono">
-                    Remota: <span class="text-zinc-200">{{ srv.remote_port }}</span>
-                    <span class="text-zinc-600 mx-1.5">➔</span>
-                    Local: <span class="text-indigo-300 font-semibold">{{ srv.local_port }}</span>
+                  <p class="text-xs text-slate-400 font-mono">
+                    Remota: <span class="text-slate-200">{{ srv.remote_port }}</span>
+                    <span class="text-slate-600 mx-1.5">➔</span>
+                    Local: <span class="text-brand-300 font-semibold">{{ srv.local_port }}</span>
                   </p>
                   <p v-if="srv.last_error" class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium">
                     <AlertCircle class="w-3.5 h-3.5 shrink-0" />
@@ -204,10 +226,6 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
 
                 <!-- HTTP Actions -->
                 <template v-else-if="srv.id === 'http'">
-                  <Button variant="primary" size="sm" @click="emit('openURL', getHTTPURL(srv.local_port))">
-                    <ExternalLink class="w-3.5 h-3.5" />
-                    <span>Abrir</span>
-                  </Button>
                   <Button variant="secondary" size="sm" @click="emit('copyText', getHTTPURL(srv.local_port), 'URL HTTP copiada!')">
                     <Copy class="w-3.5 h-3.5" />
                     <span>Copiar URL</span>
@@ -216,10 +234,6 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
 
                 <!-- HTTPS Actions -->
                 <template v-else-if="srv.id === 'https'">
-                  <Button variant="primary" size="sm" @click="emit('openURL', getHTTPSURL(srv.local_port))">
-                    <ExternalLink class="w-3.5 h-3.5" />
-                    <span>Abrir</span>
-                  </Button>
                   <Button variant="secondary" size="sm" @click="emit('copyText', getHTTPSURL(srv.local_port), 'URL HTTPS copiada!')">
                     <Copy class="w-3.5 h-3.5" />
                     <span>Copiar URL</span>
@@ -242,7 +256,7 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <Layers class="w-4 h-4 text-emerald-400" />
-            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Serviços Personalizados</h3>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Serviços Personalizados</h3>
           </div>
           <Button variant="secondary" size="sm" @click="openAddModal">
             <Plus class="w-3.5 h-3.5" />
@@ -250,13 +264,13 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
           </Button>
         </div>
 
-        <div v-if="customServices.length === 0" class="p-6 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-900/30">
-          <p class="text-xs text-zinc-500 font-medium">Nenhum serviço personalizado cadastrado</p>
-          <p class="text-[11px] text-zinc-600 mt-1">Clique em "+ Novo Serviço" para mapear portas adicionais (Redis, PostgreSQL, Grafana, etc.)</p>
+        <div v-if="customServices.length === 0" class="p-6 text-center border border-dashed border-slate-800 rounded-xl bg-slate-900/30 backdrop-blur-sm">
+          <p class="text-xs text-slate-400 font-medium">Nenhum serviço personalizado cadastrado</p>
+          <p class="text-[11px] text-slate-500 mt-1">Clique em "+ Novo Serviço" para mapear portas adicionais</p>
         </div>
 
         <div v-else class="grid grid-cols-1 gap-3">
-          <Card v-for="srv in customServices" :key="srv.id" class="p-4 hover:border-zinc-700/80">
+          <Card v-for="srv in customServices" :key="srv.id" class="p-4 bg-slate-900/40 backdrop-blur-sm border-slate-800/80 hover:border-brand-500/40 hover:shadow-brand-500/5 hover:shadow-lg transition-all duration-300">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
               <!-- Info & Status -->
@@ -268,12 +282,12 @@ const getHTTPSURL = (localPort: number) => `https://127.0.0.1:${localPort}`
 
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold text-zinc-100">{{ srv.name }}</span>
+                    <span class="text-sm font-bold text-slate-100">{{ srv.name }}</span>
                     <StatusBadge :status="getStatusType(srv)" :label="srv.last_error ? 'Erro ao iniciar' : undefined" />
                   </div>
-                  <p class="text-xs text-zinc-400 font-mono">
-                    Remota: <span class="text-zinc-200">{{ srv.remote_port }}</span>
-                    <span class="text-zinc-600 mx-1.5">➔</span>
+                  <p class="text-xs text-slate-400 font-mono">
+                    Remota: <span class="text-slate-200">{{ srv.remote_port }}</span>
+                    <span class="text-slate-600 mx-1.5">➔</span>
                     Local: <span class="text-emerald-300 font-semibold">{{ srv.local_port }}</span>
                   </p>
                   <p v-if="srv.last_error" class="text-[11px] text-rose-400 mt-1 flex items-center gap-1 font-medium">

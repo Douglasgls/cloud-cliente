@@ -82,7 +82,7 @@ const formatDate = (isoString?: string) => {
       <div class="flex items-center justify-between">
         <div>
           <h2 class="text-base font-bold text-zinc-100 flex items-center gap-2">
-            <Server class="w-5 h-5 text-indigo-400" />
+            <Server class="w-5 h-5 text-brand-400" />
             Sessões Salvas
           </h2>
           <p class="text-xs text-zinc-400">Selecione um container para conectar ou gerencie suas conexões salvas</p>
@@ -104,7 +104,7 @@ const formatDate = (isoString?: string) => {
           <!-- Card Header -->
           <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
-              <div class="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
                 <Server class="w-5 h-5" />
               </div>
               <div>
@@ -179,7 +179,7 @@ const formatDate = (isoString?: string) => {
       <Card class="w-full max-w-md space-y-5">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
               <KeyRound class="w-5 h-5" />
             </div>
             <div>

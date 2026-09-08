@@ -91,6 +91,7 @@ func main() {
 			},
 			BackgroundColour: &options.RGBA{R: 9, G: 9, B: 11, A: 255},
 			OnStartup:        bridgeApp.Startup,
+			OnShutdown:       bridgeApp.Shutdown,
 			Bind: []interface{}{
 				bridgeApp,
 			},

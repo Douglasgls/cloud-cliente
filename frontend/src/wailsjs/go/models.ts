@@ -4,6 +4,7 @@ export namespace bridge {
 	    hostname: string;
 	    tailscale_ip: string;
 	    tailscale_ipv6: string;
+	    client_tailscale_ip: string;
 
 	    static createFrom(source: any = {}) {
 	        return new ConnectionInfoDTO(source);
@@ -15,6 +16,7 @@ export namespace bridge {
 	        this.hostname = source["hostname"] || "";
 	        this.tailscale_ip = source["tailscale_ip"] || "";
 	        this.tailscale_ipv6 = source["tailscale_ipv6"] || "";
+	        this.client_tailscale_ip = source["client_tailscale_ip"] || "";
 	    }
 	}
 

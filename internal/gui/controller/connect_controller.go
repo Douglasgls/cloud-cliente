@@ -24,8 +24,9 @@ import (
 type ConnectionInfo struct {
 	ConnectionID  string
 	Hostname      string
-	TailscaleIP   string
-	TailscaleIPv6 string
+	TailscaleIP       string
+	TailscaleIPv6     string
+	ClientTailscaleIP string
 }
 
 type ConnectController struct {
@@ -332,11 +333,17 @@ func (c *ConnectController) ConnectAsync(
 
 		report("✓ Conectado")
 
+		clientIP, _ := c.tsService.IP(ctx)
+		if clientIP == "" {
+			clientIP = "-"
+		}
+
 		info := &ConnectionInfo{
-			ConnectionID:  resp.ConnectionID.String(),
-			Hostname:      resp.Hostname,
-			TailscaleIP:   resp.TailscaleIP,
-			TailscaleIPv6: resp.TailscaleIPv6,
+			ConnectionID:      resp.ConnectionID.String(),
+			Hostname:          resp.Hostname,
+			TailscaleIP:       resp.TailscaleIP,
+			TailscaleIPv6:     resp.TailscaleIPv6,
+			ClientTailscaleIP: clientIP,
 		}
 
 		c.mu.Lock()
@@ -404,6 +411,14 @@ func (c *ConnectController) Disconnect(ctx context.Context) error {
 
 	if c.fwdService != nil {
 		_ = c.fwdService.StopAll()
+	}
+
+	if c.tsService != nil {
+		_ = c.tsService.Logout(ctx)
+	}
+
+	if c.runtimeMgr != nil {
+		_ = c.runtimeMgr.StopDaemon()
 	}
 
 	c.isConnected = false

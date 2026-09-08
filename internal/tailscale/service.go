@@ -18,8 +18,11 @@ var (
 
 type TailscaleService interface {
 	Up(ctx context.Context, loginServer, authKey, hostname string) error
+	Down(ctx context.Context) error
+	Logout(ctx context.Context) error
 	Status(ctx context.Context) (string, error)
 	Version(ctx context.Context) (string, error)
+	IP(ctx context.Context) (string, error)
 }
 
 type Service struct {
@@ -69,6 +72,16 @@ func (s *Service) Up(ctx context.Context, loginServer, authKey, hostname string)
 	return nil
 }
 
+func (s *Service) Down(ctx context.Context) error {
+	_, _, err := s.runCommand(ctx, "down")
+	return err
+}
+
+func (s *Service) Logout(ctx context.Context) error {
+	_, _, err := s.runCommand(ctx, "logout")
+	return err
+}
+
 func (s *Service) Status(ctx context.Context) (string, error) {
 	stdout, stderr, err := s.runCommand(ctx, "status")
 	if err != nil {
@@ -90,6 +103,17 @@ func (s *Service) Status(ctx context.Context) (string, error) {
 
 func (s *Service) Version(ctx context.Context) (string, error) {
 	stdout, stderr, err := s.runCommand(ctx, "version")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, ErrTailscaleNotInstalled) {
+			return "", ErrTailscaleNotInstalled
+		}
+		return "", fmt.Errorf("%w: %s", ErrExecutionFailed, strings.TrimSpace(stderr))
+	}
+	return strings.TrimSpace(stdout), nil
+}
+
+func (s *Service) IP(ctx context.Context) (string, error) {
+	stdout, stderr, err := s.runCommand(ctx, "ip", "-4")
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, ErrTailscaleNotInstalled) {
 			return "", ErrTailscaleNotInstalled
