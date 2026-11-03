@@ -1,6 +1,6 @@
 # ☁️ Cloud Client
 
-O **Cloud Client** é uma aplicação desktop desenvolvida em Go usando a framework **Wails v2** e **Vite/React/JS** no frontend. Ele é responsável por estabelecer um túnel VPN seguro de forma isolada (user-space) utilizando o motor do Tailscale/Headscale, facilitando o encaminhamento de serviços (TCP Proxy) e tráfego remoto de forma transparente.
+O **Cloud Client** é uma aplicação desktop desenvolvida em Go usando o framework **Wails v2** e **Vite/Vue 3/TypeScript** no frontend. Ele é responsável por estabelecer um túnel VPN seguro de forma isolada (user-space) utilizando o motor do Tailscale/Headscale, facilitando o encaminhamento de serviços (TCP Proxy) e tráfego remoto de forma transparente.
 
 ---
 
@@ -110,17 +110,85 @@ O projeto já conta com um workflow automatizado em `.github/workflows/release.y
 3. Garanta permissão de execução e execute:
    ```bash
    chmod +x cloud-client
-   ./cloud-client
+   sudo -E ./cloud-client
    ```
 
 #### 🪟 No Windows:
 1. Baixe o `cloud-client-windows.zip` na página de **Releases** do repositório.
 2. Clique com o botão direito e selecione **Extrair Tudo...**.
-3. Abra a pasta extraída e dê duplo clique em `cloud-client.exe`.
+3. Abra a pasta extraída e dê duplo clique em `cloud-client.exe` (como Administrador se necessário para adaptações de rede).
 
+---
 
-#### comando especial linux
+## 🧪 Como Executar os Testes
+
+O projeto conta com uma suíte de testes separada em **Testes Unitários**, **Testes de Integração de Rede** e **Testes de Frontend**.
+
+### 1. Testes do Backend (Go)
+
+Todos os testes de Go rodam sem necessidade de privilégios de `root` (usam portas efêmeras e mocks para chamadas do SO/Tailscale):
+
+```bash
+# Executa todos os testes do backend com detector de concorrência (Race Detector)
+go test -v -race ./...
+```
+
+#### Executar suítes específicas:
+```bash
+# Testes de integração do Servidor DNS local (.interno, NXDOMAIN, concorrência, encerramento)
+go test -v -race ./internal/network -run TestDNSServer
+
+# Testes de integração do TCP Proxy (tráfego de dados, conexões concorrentes, desconexão)
+go test -v -race ./internal/forwarding -run TestTCPProxy
+
+# Testes unitários do Tailscale Manager (Up, Down, Logout, Auth, Status)
+go test -v -race ./internal/tailscale
+
+# Testes da Bridge Wails (Go <-> Frontend, DTOs e eventos)
+go test -v -race ./internal/bridge
+```
+
+---
+
+### 2. Testes do Frontend (Vue 3 + Vitest)
+
+Os testes de componentes e composables de UI utilizam o **Vitest** com ambiente simulado (`happy-dom`) e mocks da ponte do Wails:
+
+```bash
+cd frontend
+
+# Executar a suíte de testes do frontend uma vez
+npm test
+
+# Executar em modo interativo (assistindo alterações de código)
+npm run test:watch
+```
+
+---
+
+### 3. Integração Contínua (CI)
+
+O workflow automatizado no GitHub Actions (`.github/workflows/ci.yml`) executa a cada push e pull request:
+1. Suíte completa de testes Go com `-race`.
+2. Suíte de testes frontend com Vitest.
+3. Checagem de compilação cruzada para **Linux** e **Windows**.
+
+---
+
+## 🐧 Comandos Úteis no Linux
+
+Caso queira vincular a porta 53 sem precisar de `sudo`, ou se precisar inspecionar a resolução de DNS do `systemd-resolved`:
+
+```bash
+# Conceder permissão ao binário para ouvir na porta 53 (DNS) sem root:
 sudo setcap 'cap_net_bind_service=+ep' build/bin/cloud-client
-resolvectl status -> links de rede dns
-sudo resolvectl dns enp37s0 1.1.1.1 8.8.8.8
+
+# Inspecionar interfaces e domínios de roteamento DNS (~interno):
+resolvectl status
+
+# Limpar o cache do resolvedor do sistema:
 resolvectl flush-caches
+
+# Executar em desenvolvimento preservando variáveis de ambiente:
+sudo -E ./build/bin/cloud-client
+```

@@ -25,13 +25,23 @@ type TailscaleService interface {
 	IP(ctx context.Context) (string, error)
 }
 
+type CommandExecutor func(ctx context.Context, binary string, args ...string) (stdout string, stderr string, err error)
+
 type Service struct {
 	runtime runtime.RuntimeManager
+	execFn  CommandExecutor
 }
 
 func NewService(runtimeMgr runtime.RuntimeManager) *Service {
 	return &Service{
 		runtime: runtimeMgr,
+	}
+}
+
+func NewServiceWithExecutor(runtimeMgr runtime.RuntimeManager, fn CommandExecutor) *Service {
+	return &Service{
+		runtime: runtimeMgr,
+		execFn:  fn,
 	}
 }
 
@@ -133,6 +143,10 @@ func (s *Service) runCommand(ctx context.Context, args ...string) (string, strin
 		cmdArgs = append(cmdArgs, "--socket="+socketPath)
 	}
 	cmdArgs = append(cmdArgs, args...)
+
+	if s.execFn != nil {
+		return s.execFn(ctx, s.runtime.TailscalePath(), cmdArgs...)
+	}
 
 	cmd := exec.CommandContext(ctx, s.runtime.TailscalePath(), cmdArgs...)
 	runtime.ConfigureCmdHideWindow(cmd)

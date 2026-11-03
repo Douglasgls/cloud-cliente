@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"cloud-client/internal/config"
@@ -15,9 +16,9 @@ import (
 )
 
 var (
-	ErrUnableToContactCloud = errors.New("Unable to contact Cloud.")
-	ErrInvalidToken         = errors.New("Invalid token.")
-	ErrConnectionExpired    = errors.New("Connection expired.")
+	ErrUnableToContactCloud = errors.New("Não foi possível conectar aos servidores da Cloud.")
+	ErrInvalidToken         = errors.New("Token inválido ou não encontrado.")
+	ErrConnectionExpired    = errors.New("Este token de conexão expirou.")
 )
 
 type CloudClient interface {
@@ -105,11 +106,19 @@ func (c *Client) Connect(ctx context.Context, token string) (*ConnectResponse, e
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errResp ErrorResponse
 		_ = json.Unmarshal(respBody, &errResp)
-		if errResp.Message != "" {
-			return nil, fmt.Errorf("%w: %s", ErrUnableToContactCloud, errResp.Message)
+		msg := errResp.Message
+		if msg == "" {
+			msg = errResp.Error
 		}
-		if errResp.Error != "" {
-			return nil, fmt.Errorf("%w: %s", ErrUnableToContactCloud, errResp.Error)
+		lower := strings.ToLower(msg)
+		if strings.Contains(lower, "invalid token") || strings.Contains(lower, "token invalid") || strings.Contains(lower, "token inválido") || strings.Contains(lower, "token not found") || strings.Contains(lower, "token não encontrado") {
+			return nil, ErrInvalidToken
+		}
+		if strings.Contains(lower, "expired") || strings.Contains(lower, "expirou") {
+			return nil, ErrConnectionExpired
+		}
+		if msg != "" {
+			return nil, fmt.Errorf("%w: %s", ErrUnableToContactCloud, msg)
 		}
 		return nil, fmt.Errorf("%w: %s returned HTTP status %d", ErrUnableToContactCloud, url, resp.StatusCode)
 	}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   KeyRound,
   RotateCw,
@@ -11,12 +11,15 @@ import {
   Network,
   Clock,
   Trash2,
-  Play
+  Play,
+  X,
+  Copy
 } from '@lucide/vue'
 import Card from '../ui/Card.vue'
 import Button from '../ui/Button.vue'
 import Input from '../ui/Input.vue'
 import { bridge } from '../../wailsjs/go/models'
+import { formatConnectionError } from '../../utils/errors'
 
 const props = defineProps<{
   hasSession: boolean
@@ -28,10 +31,23 @@ const emit = defineEmits<{
   (e: 'connect', token: string): void
   (e: 'reconnectSession', id: string): void
   (e: 'forgetSession', id: string): void
+  (e: 'copyText', text: string, label?: string): void
 }>()
 
 const token = ref('')
+const localError = ref('')
+const isDismissed = ref(false)
 const showTokenForm = ref(!props.hasSession || (props.sessions && props.sessions.length === 0))
+
+const activeError = computed(() => {
+  if (isDismissed.value) return ''
+  return localError.value || props.errorMessage || ''
+})
+
+const formattedError = computed(() => {
+  if (!activeError.value) return null
+  return formatConnectionError(activeError.value)
+})
 
 watch(
   () => props.sessions,
@@ -43,9 +59,39 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => props.errorMessage,
+  (newErr) => {
+    if (newErr) {
+      isDismissed.value = false
+      localError.value = ''
+    }
+  }
+)
+
+watch(token, () => {
+  if (localError.value) {
+    localError.value = ''
+  }
+  if (!isDismissed.value && props.errorMessage) {
+    isDismissed.value = true
+  }
+})
+
+const dismissError = () => {
+  isDismissed.value = true
+  localError.value = ''
+}
+
 const handleConnectSubmit = () => {
-  if (token.value.trim()) {
-    emit('connect', token.value.trim())
+  const trimmed = token.value.trim()
+  if (trimmed) {
+    isDismissed.value = false
+    localError.value = ''
+    emit('connect', trimmed)
+  } else {
+    isDismissed.value = false
+    localError.value = 'Por favor, informe um token de conexão válido.'
   }
 }
 
@@ -70,10 +116,30 @@ const formatDate = (isoString?: string) => {
 <template>
   <div class="flex flex-col h-full max-w-2xl mx-auto p-6 space-y-6 overflow-y-auto custom-scrollbar">
 
-    <!-- Error Alert -->
-    <div v-if="errorMessage" class="w-full flex items-start gap-3 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium shrink-0">
-      <AlertCircle class="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-      <span>{{ errorMessage }}</span>
+    <!-- Error Alert with Clear Title & Action Guidance -->
+    <div
+      v-if="formattedError"
+      class="w-full flex items-start gap-3.5 p-4 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs shrink-0 shadow-lg shadow-rose-950/20"
+    >
+      <div class="p-1 rounded-lg bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
+        <AlertCircle class="w-4 h-4" />
+      </div>
+      <div class="flex flex-col gap-1 flex-1">
+        <span class="font-semibold text-rose-200 text-sm leading-tight">
+          {{ formattedError.title }}
+        </span>
+        <span v-if="formattedError.hint" class="text-rose-300/85 text-xs leading-relaxed">
+          {{ formattedError.hint }}
+        </span>
+      </div>
+      <button
+        type="button"
+        @click="dismissError"
+        class="text-rose-400/60 hover:text-rose-300 p-1 rounded-lg hover:bg-rose-500/10 transition-colors"
+        title="Dispensar aviso"
+      >
+        <X class="w-4 h-4" />
+      </button>
     </div>
 
     <!-- Mode A: Session Manager Cards List -->
@@ -108,10 +174,16 @@ const formatDate = (isoString?: string) => {
                 <Server class="w-5 h-5" />
               </div>
               <div>
-                <h3 class="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                  {{ sess.container_name || sess.hostname || 'Container' }}
-                  <span v-if="sess.hostname" class="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50">
-                    {{ sess.hostname }}
+                <h3 class="text-sm font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
+                  <span>{{ sess.container_name || sess.hostname || 'Container' }}</span>
+                  <span
+                    v-if="sess.hostname"
+                    @click.stop="emit('copyText', `${sess.hostname}.interno`, 'Link do container copiado!')"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-mono rounded-lg bg-zinc-800 hover:bg-brand-500/15 border border-zinc-700/60 hover:border-brand-500/40 text-zinc-300 hover:text-brand-200 cursor-pointer transition-colors"
+                    title="Copiar link do container"
+                  >
+                    <span>{{ sess.hostname }}.interno</span>
+                    <Copy class="w-3 h-3 text-zinc-400 hover:text-brand-300 shrink-0" />
                   </span>
                 </h3>
                 <p class="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">

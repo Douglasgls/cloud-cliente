@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -201,8 +202,8 @@ func (a *App) GetConnectionInfo() ConnectionInfoDTO {
 }
 
 func (a *App) Connect(token string) error {
-	if token == "" {
-		return fmt.Errorf("informe um token válido")
+	if strings.TrimSpace(token) == "" {
+		return fmt.Errorf("informe um token de conexão válido")
 	}
 
 	errChan := make(chan error, 1)
