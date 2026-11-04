@@ -244,7 +244,7 @@ func (c *ConnectController) ConnectAsync(
 		report("Preparando runtime...")
 		if err := c.runtimeMgr.Prepare(); err != nil {
 			if onError != nil {
-				onError(fmt.Errorf("falha ao preparar runtime: %w", err))
+				onError(fmt.Errorf("falha ao preparar componentes do sistema: %w", err))
 			}
 			return
 		}
@@ -252,7 +252,7 @@ func (c *ConnectController) ConnectAsync(
 		report("Iniciando daemon...")
 		if err := c.runtimeMgr.EnsureDaemonRunning(ctx); err != nil {
 			if onError != nil {
-				onError(fmt.Errorf("falha ao iniciar daemon: %w", err))
+				onError(fmt.Errorf("falha ao iniciar o serviço de rede local: %w", err))
 			}
 			return
 		}
@@ -265,9 +265,16 @@ func (c *ConnectController) ConnectAsync(
 					_ = c.sessionSvc.Delete()
 				}
 			}
-			if onError != nil {
-				onError(err)
-			}
+				errStr := strings.ToLower(err.Error())
+				if errors.Is(err, cloud.ErrInvalidToken) || strings.Contains(errStr, "invalid token") || strings.Contains(errStr, "token inválido") || strings.Contains(errStr, "unauthorized") || strings.Contains(errStr, "forbidden") {
+					onError(fmt.Errorf("Token inválido ou não encontrado. Verifique se o token foi copiado corretamente do painel da Cloud."))
+				} else if errors.Is(err, cloud.ErrConnectionExpired) || strings.Contains(errStr, "expired") || strings.Contains(errStr, "expirou") {
+					onError(fmt.Errorf("Este token de conexão expirou. Gere um novo token no painel da Cloud para se conectar."))
+				} else if errors.Is(err, cloud.ErrUnableToContactCloud) {
+					onError(fmt.Errorf("Não foi possível conectar aos servidores da Cloud. Verifique sua conexão com a internet e tente novamente."))
+				} else {
+					onError(err)
+				}
 			return
 		}
 
@@ -296,7 +303,7 @@ func (c *ConnectController) ConnectAsync(
 		clientHostname := "client-" + resp.Hostname
 		if err := c.tsService.Up(ctx, resp.LoginServer, resp.PreauthKey, clientHostname); err != nil {
 			if onError != nil {
-				onError(fmt.Errorf("falha no Tailscale: %w", err))
+				onError(fmt.Errorf("falha ao estabelecer o túnel seguro (Tailscale). O servidor de controle pode estar indisponível: %w", err))
 			}
 			return
 		}
@@ -304,7 +311,7 @@ func (c *ConnectController) ConnectAsync(
 		report("Confirmando conexão...")
 		if _, err := c.cloudClient.Confirm(ctx, resp.ConnectionID.String()); err != nil {
 			if onError != nil {
-				onError(fmt.Errorf("falha na confirmação: %w", err))
+				onError(fmt.Errorf("falha ao confirmar a conexão com a Cloud: %w", err))
 			}
 			return
 		}
@@ -317,7 +324,7 @@ func (c *ConnectController) ConnectAsync(
 		if c.fwdService != nil && c.dialer != nil {
 			if err := c.fwdService.StartAll(targetIP, c.dialer); err != nil {
 				if onError != nil {
-					onError(fmt.Errorf("falha ao iniciar serviços: %w", err))
+					onError(fmt.Errorf("falha ao iniciar redirecionamentos locais (verifique se as portas não estão em uso): %w", err))
 				}
 				return
 			}

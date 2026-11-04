@@ -78,6 +78,7 @@ const {
         @connect="connect"
         @reconnect-session="reconnectSession"
         @forget-session="forgetSession"
+        @copy-text="copyText"
       />
     </main>
 

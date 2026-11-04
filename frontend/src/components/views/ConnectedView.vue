@@ -14,7 +14,8 @@ import {
   Lock,
   Layers,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck
 } from '@lucide/vue'
 
 import Card from '../ui/Card.vue'
@@ -101,39 +102,71 @@ const getHTTPSURL = (localPort: number) => `https://${props.connectionInfo.hostn
         </div>
       </div>
 
-      <Card class="border-brand-500/20 bg-slate-900/50 backdrop-blur-md shadow-2xl shadow-brand-500/10">
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-800/80">
-
+      <Card class="border-brand-500/20 bg-slate-900/50 backdrop-blur-md shadow-2xl shadow-brand-500/10 p-5 space-y-4">
+        <!-- Top Row: Container Identity, Highlighted Domain Link & Disconnect Button -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
           <!-- Container Name -->
-          <div class="flex items-center gap-3">
-            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400 shrink-0">
               <Server class="w-5 h-5" />
             </div>
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="Nome do Container">Container</p>
-              <h2 class="text-sm font-bold text-slate-100 truncate">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Container</p>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Ativo
+                </span>
+              </div>
+              <h2 class="text-sm font-bold text-slate-100 truncate" :title="connectionInfo.hostname || connectionInfo.connection_id">
                 {{ connectionInfo.hostname || connectionInfo.connection_id || 'Conectado' }}
               </h2>
-              <div 
-                v-if="connectionInfo.hostname"
-                class="flex items-center gap-1 mt-0.5 group cursor-pointer" 
-                @click="emit('copyText', `${connectionInfo.hostname}.interno`, 'URL Base copiada!')" 
-                title="Copiar URL Base"
-              >
-                <p class="text-[11px] text-brand-400 font-mono">{{ connectionInfo.hostname }}.interno</p>
-                <Copy class="w-3 h-3 text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
             </div>
           </div>
 
-          <!-- Tailscale IP -->
-          <div class="flex items-center gap-3 sm:pl-4 pt-3 sm:pt-0">
-            <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <Network class="w-5 h-5" />
+          <!-- Highlighted Container Domain Link with Copy Button -->
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <div
+              v-if="connectionInfo.hostname"
+              @click="emit('copyText', `${connectionInfo.hostname}.interno`, 'Link do container copiado!')"
+              class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-brand-500/15 hover:bg-brand-500/25 border border-brand-500/35 hover:border-brand-500/60 transition-all cursor-pointer group shadow-sm shadow-brand-500/10"
+              title="Clique para copiar o link completo do container"
+            >
+              <div class="p-1.5 rounded-lg bg-brand-500/20 text-brand-400 shrink-0">
+                <Globe class="w-4 h-4" />
+              </div>
+              <div class="flex flex-col">
+                <span class="text-[9px] uppercase font-bold text-brand-400 tracking-wider leading-none mb-0.5">Link do Container</span>
+                <span class="text-xs font-mono font-bold text-brand-200 group-hover:text-white transition-colors">
+                  {{ connectionInfo.hostname }}.interno
+                </span>
+              </div>
+              <button
+                type="button"
+                class="ml-1.5 p-1.5 rounded-lg bg-brand-500/20 hover:bg-brand-500/40 text-brand-300 hover:text-white transition-all group-hover:scale-105 shrink-0"
+                title="Copiar link do container"
+              >
+                <Copy class="w-4 h-4" />
+              </button>
+            </div>
+
+            <Button variant="danger" size="sm" @click="emit('disconnect')" title="Desconectar" class="h-9">
+              <LogOut class="w-3.5 h-3.5" />
+              <span>Desconectar</span>
+            </Button>
+          </div>
+        </div>
+
+        <!-- Bottom Row: Network Details (Container IP, Client IP, Connection ID) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 divide-y sm:divide-y-0 sm:divide-x divide-slate-800/80">
+          <!-- Container IP -->
+          <div class="flex items-center gap-3">
+            <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+              <Network class="w-4 h-4" />
             </div>
             <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="IP do Container Remoto">Container IP</p>
-              <h2 class="text-sm font-mono font-bold text-emerald-400">
+              <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider" title="IP do Container Remoto">Container IP</p>
+              <h2 class="text-xs font-mono font-bold text-emerald-400">
                 {{ connectionInfo.tailscale_ip || '-' }}
               </h2>
             </div>
@@ -141,31 +174,29 @@ const getHTTPSURL = (localPort: number) => `https://${props.connectionInfo.hostn
 
           <!-- Local Tailscale IP -->
           <div class="flex items-center gap-3 sm:pl-4 pt-3 sm:pt-0">
-            <div class="p-2.5 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
-              <Globe class="w-5 h-5" />
+            <div class="p-2 rounded-lg bg-brand-500/10 border border-brand-500/20 text-brand-400 shrink-0">
+              <Globe class="w-4 h-4" />
             </div>
             <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="Seu IP Local na Rede Tailscale">Client IP</p>
-              <h2 class="text-sm font-mono font-bold text-brand-400">
+              <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider" title="Seu IP Local na Rede Tailscale">Client IP</p>
+              <h2 class="text-xs font-mono font-bold text-brand-400">
                 {{ connectionInfo.client_tailscale_ip || '-' }}
               </h2>
             </div>
           </div>
 
-          <!-- Connection Status / ID -->
-          <div class="flex items-center justify-between sm:pl-4 pt-3 sm:pt-0">
-            <div>
-              <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider" title="ID único da conexão atual">ID da Conexão</p>
-              <h2 class="text-xs font-mono font-semibold text-slate-300 truncate max-w-[140px]">
+          <!-- Connection ID -->
+          <div class="flex items-center gap-3 sm:pl-4 pt-3 sm:pt-0">
+            <div class="p-2 rounded-lg bg-slate-800 border border-slate-700/60 text-slate-400 shrink-0">
+              <ShieldCheck class="w-4 h-4" />
+            </div>
+            <div class="min-w-0">
+              <p class="text-[10px] font-medium text-slate-400 uppercase tracking-wider" title="ID único da conexão atual">ID da Conexão</p>
+              <h2 class="text-xs font-mono font-semibold text-slate-300 truncate max-w-[160px]">
                 {{ connectionInfo.connection_id || '-' }}
               </h2>
             </div>
-            <Button variant="danger" size="sm" @click="emit('disconnect')" title="Desconectar">
-              <LogOut class="w-3.5 h-3.5" />
-              <span class="hidden sm:inline">Desconectar</span>
-            </Button>
           </div>
-
         </div>
       </Card>
     </div>
